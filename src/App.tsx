@@ -14,9 +14,12 @@ import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
+import AccessGateModal, { readAccessSession } from './components/AccessGateModal'
 
 export default function App() {
   const setSettings = useStore((s) => s.setSettings)
+  const isAccessGranted = useStore((s) => s.isAccessGranted)
+  const setAccessGranted = useStore((s) => s.setAccessGranted)
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -55,8 +58,9 @@ export default function App() {
       window.history.replaceState(null, '', nextUrl)
     }
 
+    setAccessGranted(readAccessSession())
     initStore()
-  }, [setSettings])
+  }, [setSettings, setAccessGranted])
 
   useEffect(() => {
     const preventPageImageDrag = (e: DragEvent) => {
@@ -68,6 +72,15 @@ export default function App() {
     document.addEventListener('dragstart', preventPageImageDrag)
     return () => document.removeEventListener('dragstart', preventPageImageDrag)
   }, [])
+
+  if (!isAccessGranted) {
+    return (
+      <>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950" />
+        <AccessGateModal />
+      </>
+    )
+  }
 
   return (
     <>
