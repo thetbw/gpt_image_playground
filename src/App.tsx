@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { initStore } from './store'
 import { useStore } from './store'
 import { normalizeBaseUrl } from './lib/api'
-import type { ApiMode } from './types'
+import type { ApiMode, AppSettings } from './types'
 import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import TaskGrid from './components/TaskGrid'
@@ -15,33 +15,35 @@ import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
 
+export function getUrlSettingsOverrides(search: string, settings: AppSettings): Partial<AppSettings> {
+  const searchParams = new URLSearchParams(search)
+  const nextSettings: { baseUrl?: string; codexCli?: boolean; apiMode?: ApiMode } = {}
+  const managed = settings.managedConfig
+
+  const apiUrlParam = searchParams.get('apiUrl')
+  if (!managed.managedApiUrl && apiUrlParam !== null) {
+    nextSettings.baseUrl = normalizeBaseUrl(apiUrlParam.trim())
+  }
+
+  const codexCliParam = searchParams.get('codexCli')
+  if (!managed.managedCodexCli && codexCliParam !== null) {
+    nextSettings.codexCli = codexCliParam.trim().toLowerCase() === 'true'
+  }
+
+  const apiModeParam = searchParams.get('apiMode')
+  if (!managed.managedApiMode && (apiModeParam === 'images' || apiModeParam === 'responses')) {
+    nextSettings.apiMode = apiModeParam
+  }
+
+  return nextSettings
+}
+
 export default function App() {
   const setSettings = useStore((s) => s.setSettings)
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
-    const nextSettings: { baseUrl?: string; apiKey?: string; codexCli?: boolean; apiMode?: ApiMode } = {}
-
-    const apiUrlParam = searchParams.get('apiUrl')
-    if (apiUrlParam !== null) {
-      nextSettings.baseUrl = normalizeBaseUrl(apiUrlParam.trim())
-    }
-
-    const apiKeyParam = searchParams.get('apiKey')
-    if (apiKeyParam !== null) {
-      nextSettings.apiKey = apiKeyParam.trim()
-    }
-
-    const codexCliParam = searchParams.get('codexCli')
-    if (codexCliParam !== null) {
-      nextSettings.codexCli = codexCliParam.trim().toLowerCase() === 'true'
-    }
-
-    const apiModeParam = searchParams.get('apiMode')
-    if (apiModeParam === 'images' || apiModeParam === 'responses') {
-      nextSettings.apiMode = apiModeParam
-    }
-
+    const nextSettings = getUrlSettingsOverrides(window.location.search, useStore.getState().settings)
     setSettings(nextSettings)
 
     if (searchParams.has('apiUrl') || searchParams.has('apiKey') || searchParams.has('codexCli') || searchParams.has('apiMode')) {

@@ -98,11 +98,14 @@ async function getApiErrorMessage(response: Response): Promise<string> {
 }
 
 function createRequestHeaders(settings: AppSettings): Record<string, string> {
-  return {
-    Authorization: `Bearer ${settings.apiKey}`,
+  const headers: Record<string, string> = {
     'Cache-Control': 'no-store, no-cache, max-age=0',
     Pragma: 'no-cache',
   }
+  if (!settings.managedConfig.managedProxyAuth) {
+    headers.Authorization = `Bearer ${settings.apiKey}`
+  }
+  return headers
 }
 
 function createResponsesImageTool(

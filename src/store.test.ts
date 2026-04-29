@@ -75,3 +75,20 @@ describe('mask draft lifecycle in store actions', () => {
     expect(useStore.getState().maskDraft).toBeNull()
   })
 })
+
+describe('managed settings merge', () => {
+  it('keeps existing managed flags when partial settings updates are applied', () => {
+    useStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        managedConfig: {
+          ...DEFAULT_SETTINGS.managedConfig,
+          managedApiUrl: true,
+        },
+      },
+    })
+
+    useStore.getState().setSettings({ apiMode: 'responses' })
+    expect(useStore.getState().settings.managedConfig.managedApiUrl).toBe(true)
+  })
+})
