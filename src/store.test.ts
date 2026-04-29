@@ -5,7 +5,6 @@ import { editOutputs, submitTask, useStore } from './store'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
 
-
 class MemorySessionStorage {
   private storage = new Map<string, string>()
   getItem(key: string) { return this.storage.get(key) ?? null }
@@ -85,7 +84,6 @@ describe('mask draft lifecycle in store actions', () => {
   })
 })
 
-
 describe('access gate state', () => {
   beforeEach(() => {
     useStore.setState({
@@ -111,6 +109,9 @@ describe('access gate state', () => {
     const { readAccessSession, writeAccessSession } = await import('./components/AccessGateModal')
     writeAccessSession(true)
     expect(readAccessSession()).toBe(true)
+  })
+})
+
 describe('managed settings merge', () => {
   it('keeps existing managed flags when partial settings updates are applied', () => {
     useStore.setState({
