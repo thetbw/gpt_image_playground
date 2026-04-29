@@ -111,6 +111,8 @@ interface AppState {
   setLightboxImageId: (id: string | null, list?: string[]) => void
   showSettings: boolean
   setShowSettings: (v: boolean) => void
+  isAccessGranted: boolean
+  setAccessGranted: (granted: boolean) => void
 
   // Toast
   toast: { message: string; type: 'info' | 'success' | 'error' } | null
@@ -256,6 +258,8 @@ export const useStore = create<AppState>()(
         set({ lightboxImageId, lightboxImageList: list ?? (lightboxImageId ? [lightboxImageId] : []) }),
       showSettings: false,
       setShowSettings: (showSettings) => set({ showSettings }),
+      isAccessGranted: false,
+      setAccessGranted: (isAccessGranted) => set({ isAccessGranted }),
 
       // Toast
       toast: null,

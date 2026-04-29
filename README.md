@@ -182,6 +182,22 @@ services:
 
 如果使用 bridge 网络并修改了容器内 `PORT`，需要同步调整端口映射，例如 `PORT=28080` 时使用 `"8080:28080"`。使用 host 网络时不要配置 `ports`。
 
+
+### 访问门禁（`ACCESS_PASSWORD`）
+
+可通过 `ACCESS_PASSWORD` 为容器增加一个轻量访问门禁。前端会先调用同源 `POST /auth/verify` 校验密码，密码只在服务端环境变量中保存，不会注入前端 JS 包。
+
+```bash
+docker run -d -p 8080:80 \
+  -e API_URL=https://api.openai.com/v1 \
+  -e ACCESS_PASSWORD='your-strong-password' \
+  ghcr.io/cooksleep/gpt_image_playground:latest
+```
+
+- 忘记密码时，直接修改容器环境变量并重启容器即可生效。
+- 建议在公网部署时强制 HTTPS，避免密码明文传输。
+- 建议在前置反向代理层（如 Nginx/Traefik/Cloudflare）增加限流、失败次数控制与封禁策略，降低暴力尝试风险。
+
 *(注：官方镜像同时提供带版本号的标签，如 `0.1.11` 或 `0.1`)*
 
 **更新说明：**

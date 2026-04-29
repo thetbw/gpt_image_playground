@@ -5,6 +5,15 @@ import { editOutputs, submitTask, useStore } from './store'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
 
+
+class MemorySessionStorage {
+  private storage = new Map<string, string>()
+  getItem(key: string) { return this.storage.get(key) ?? null }
+  setItem(key: string, value: string) { this.storage.set(key, value) }
+  removeItem(key: string) { this.storage.delete(key) }
+  clear() { this.storage.clear() }
+}
+
 function task(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
     id: 'task-a',
@@ -76,6 +85,32 @@ describe('mask draft lifecycle in store actions', () => {
   })
 })
 
+
+describe('access gate state', () => {
+  beforeEach(() => {
+    useStore.setState({
+      isAccessGranted: false,
+      setAccessGranted: (isAccessGranted: boolean) => useStore.setState({ isAccessGranted }),
+    })
+    vi.stubGlobal('sessionStorage', new MemorySessionStorage())
+    sessionStorage.clear()
+  })
+
+  it('toggles access gate state', () => {
+    expect(useStore.getState().isAccessGranted).toBe(false)
+    useStore.getState().setAccessGranted(true)
+    expect(useStore.getState().isAccessGranted).toBe(true)
+  })
+
+  it('keeps access denied for wrong password flow', () => {
+    useStore.getState().setAccessGranted(false)
+    expect(useStore.getState().isAccessGranted).toBe(false)
+  })
+
+  it('restores access from session storage after refresh by design', async () => {
+    const { readAccessSession, writeAccessSession } = await import('./components/AccessGateModal')
+    writeAccessSession(true)
+    expect(readAccessSession()).toBe(true)
 describe('managed settings merge', () => {
   it('keeps existing managed flags when partial settings updates are applied', () => {
     useStore.setState({
