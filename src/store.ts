@@ -140,6 +140,10 @@ export const useStore = create<AppState>()(
         settings: {
           ...st.settings,
           ...s,
+          managedConfig: {
+            ...st.settings.managedConfig,
+            ...s.managedConfig,
+          },
           apiMode:
             s.apiMode === 'images' || s.apiMode === 'responses'
               ? s.apiMode

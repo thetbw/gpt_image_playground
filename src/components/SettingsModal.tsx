@@ -18,6 +18,7 @@ export default function SettingsModal() {
   const [showApiKey, setShowApiKey] = useState(false)
   const apiProxyAvailable = isApiProxyAvailable(readClientDevProxyConfig())
   const apiProxyEnabled = apiProxyAvailable && draft.apiProxy
+  const managed = settings.managedConfig
 
   const getDefaultModelForMode = (apiMode: AppSettings['apiMode']) =>
     apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
@@ -122,10 +123,12 @@ export default function SettingsModal() {
                     onClick={(e) => {
                       e.preventDefault()
                       const nextDraft = { ...draft, codexCli: !draft.codexCli }
-                      setDraft(nextDraft)
-                      commitSettings(nextDraft)
+                      if (!managed.managedCodexCli) {
+                        setDraft(nextDraft)
+                        commitSettings(nextDraft)
+                      }
                     }}
-                    className="flex cursor-pointer items-center gap-1.5"
+                    className={`flex items-center gap-1.5 ${managed.managedCodexCli ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                     role="switch"
                     aria-checked={draft.codexCli}
                   >
@@ -140,15 +143,17 @@ export default function SettingsModal() {
                   onChange={(e) => setDraft((prev) => ({ ...prev, baseUrl: e.target.value }))}
                   onBlur={(e) => commitSettings({ ...draft, baseUrl: e.target.value })}
                   type="text"
-                  disabled={apiProxyEnabled}
+                  disabled={apiProxyEnabled || managed.managedApiUrl}
                   placeholder={DEFAULT_SETTINGS.baseUrl}
-                  className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${apiProxyEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${(apiProxyEnabled || managed.managedApiUrl) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 <div data-selectable-text className="mt-1 min-h-[22px] flex items-center text-[10px] text-gray-400 dark:text-gray-500">
-                  {apiProxyEnabled ? (
+                  {managed.managedApiUrl ? (
+                    <span className="text-yellow-600 dark:text-yellow-500">由部署端托管，不可编辑。</span>
+                  ) : apiProxyEnabled ? (
                     <span className="text-yellow-600 dark:text-yellow-500">已开启代理，实际请求目标由部署端决定，此处设置被忽略。</span>
                   ) : (
-                    <span>支持通过查询参数覆盖：<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiUrl=</code>，<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">codexCli=true</code></span>
+                    <span>可在此配置 API URL 与 Codex CLI 兼容模式。</span>
                   )}
                 </div>
               </label>
@@ -182,12 +187,13 @@ export default function SettingsModal() {
                 <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">API Key</span>
                 <div className="relative">
                   <input
+                    disabled={managed.managedApiKey || managed.managedProxyAuth}
                     value={draft.apiKey}
                     onChange={(e) => setDraft((prev) => ({ ...prev, apiKey: e.target.value }))}
                     onBlur={(e) => commitSettings({ ...draft, apiKey: e.target.value })}
                     type={showApiKey ? 'text' : 'password'}
                     placeholder="sk-..."
-                    className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 pr-10 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+                    className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 pr-10 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${(managed.managedApiKey || managed.managedProxyAuth) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                   <button
                     type="button"
@@ -211,7 +217,7 @@ export default function SettingsModal() {
                   </button>
                 </div>
                 <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                  支持通过查询参数覆盖：<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiKey=</code>
+                  {(managed.managedApiKey || managed.managedProxyAuth) ? '由部署端托管，不可编辑。' : '仅保存在当前浏览器。'}
                 </div>
               </div>
 
@@ -220,6 +226,7 @@ export default function SettingsModal() {
                 <Select
                   value={draft.apiMode ?? DEFAULT_SETTINGS.apiMode}
                   onChange={(value) => {
+                    if (managed.managedApiMode) return
                     const apiMode = value as AppSettings['apiMode']
                     const nextModel =
                       draft.model === DEFAULT_IMAGES_MODEL || draft.model === DEFAULT_RESPONSES_MODEL
@@ -234,9 +241,10 @@ export default function SettingsModal() {
                     { label: 'Responses API (/v1/responses)', value: 'responses' },
                   ]}
                   className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+                  disabled={managed.managedApiMode}
                 />
                 <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                  支持通过查询参数覆盖：<code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=images</code> 或 <code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=responses</code>。
+                  {managed.managedApiMode ? '由部署端托管，不可编辑。' : '可在此切换 Images/Responses 接口。'}
                 </div>
               </label>
 

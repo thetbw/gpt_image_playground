@@ -111,5 +111,19 @@ describe('access gate state', () => {
     const { readAccessSession, writeAccessSession } = await import('./components/AccessGateModal')
     writeAccessSession(true)
     expect(readAccessSession()).toBe(true)
+describe('managed settings merge', () => {
+  it('keeps existing managed flags when partial settings updates are applied', () => {
+    useStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        managedConfig: {
+          ...DEFAULT_SETTINGS.managedConfig,
+          managedApiUrl: true,
+        },
+      },
+    })
+
+    useStore.getState().setSettings({ apiMode: 'responses' })
+    expect(useStore.getState().settings.managedConfig.managedApiUrl).toBe(true)
   })
 })
