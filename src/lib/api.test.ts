@@ -124,4 +124,27 @@ describe('callImageApi', () => {
       expect.objectContaining({ method: 'POST' }),
     )
   })
+
+  it('does not send authorization header when managed proxy auth is enabled', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'should-not-send',
+        managedConfig: {
+          ...DEFAULT_SETTINGS.managedConfig,
+          managedProxyAuth: true,
+        },
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect((init as RequestInit).headers).not.toMatchObject({ Authorization: expect.any(String) })
+  })
 })

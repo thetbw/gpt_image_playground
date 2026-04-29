@@ -2,6 +2,14 @@
 
 export type ApiMode = 'images' | 'responses'
 
+export interface ManagedConfig {
+  managedApiUrl: boolean
+  managedApiKey: boolean
+  managedCodexCli: boolean
+  managedApiMode: boolean
+  managedProxyAuth: boolean
+}
+
 export interface AppSettings {
   baseUrl: string
   apiKey: string
@@ -10,11 +18,20 @@ export interface AppSettings {
   apiMode: ApiMode
   codexCli: boolean
   apiProxy: boolean
+  managedConfig: ManagedConfig
 }
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_DEFAULT_API_URL?.trim() || 'https://api.openai.com/v1'
 export const DEFAULT_IMAGES_MODEL = 'gpt-image-2'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
+
+export const DEFAULT_MANAGED_CONFIG: ManagedConfig = {
+  managedApiUrl: import.meta.env.VITE_MANAGED_API_URL === 'true',
+  managedApiKey: import.meta.env.VITE_MANAGED_API_KEY === 'true',
+  managedCodexCli: import.meta.env.VITE_MANAGED_CODEX_CLI === 'true',
+  managedApiMode: import.meta.env.VITE_MANAGED_API_MODE === 'true',
+  managedProxyAuth: import.meta.env.VITE_MANAGED_PROXY_AUTH === 'true',
+}
 
 export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: DEFAULT_BASE_URL,
@@ -24,6 +41,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   apiMode: 'images',
   codexCli: false,
   apiProxy: false,
+  managedConfig: DEFAULT_MANAGED_CONFIG,
 }
 
 // ===== 任务参数 =====

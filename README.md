@@ -160,9 +160,23 @@ services:
     restart: unless-stopped
 ```
 
-浏览器访问 `http://localhost:8080`，在页面右上角设置中填入 API Key 即可使用。
+浏览器访问 `http://localhost:8080`，可在页面右上角设置中填写 API URL / API Key（若未启用受管模式）。
 
 如果你的 API 节点没有放开浏览器跨域，可以用环境变量 `ENABLE_API_PROXY=true` 开启容器内 Nginx 代理。开启后，设置面板才会展示 **API 代理** 开关；用户启用该开关后，浏览器会请求同源的 `/api-proxy/`，由容器内 Nginx 转发到部署端配置的 `API_URL`。
+
+### 受管模式（Managed Mode）
+
+支持以下可选环境变量：
+
+- `MANAGED_API_URL`：托管前端的 API URL 设置。
+- `MANAGED_API_KEY`：托管服务端 API Key（不会注入前端 JS）。
+- `MANAGED_CODEX_CLI`：托管 Codex CLI 模式开关。
+- `MANAGED_API_MODE`：托管 API 模式（`images`/`responses`）。
+
+当上述字段被托管时：
+- 前端对应设置项会显示“由部署端托管，不可编辑”并禁用。
+- URL 查询参数对对应字段的覆盖会被禁用。
+- 若配置了 `MANAGED_API_KEY`，前端请求应走同源 `/api-proxy/`，由 Nginx 注入 `Authorization: Bearer ...` 后再转发到上游 API；密钥不会进入浏览器可读配置或构建产物。
 
 ⚠️ **安全警告**：开启 `ENABLE_API_PROXY=true` 后，任何人都能将你的服务器作为代理来请求目标 API。虽然请求本身仍需携带有效的 API Key 才能成功，但这可能会消耗你的服务器带宽。如果目标 API 是内网服务或基于 IP 白名单免密访问，则存在被未经授权调用的风险。建议仅在本地开发或有访问控制（如 IP 白名单、前置认证机制等）的环境中开启此功能。
 
@@ -266,9 +280,8 @@ docker compose up -d
 - Codex CLI 模式下，Images API 的图片数量会通过并发发起多个单图请求实现；Responses API 原本也通过并发请求实现多图生成。
 - 如果检测到接口返回的提示词被改写，应用会提示是否为当前 `API URL + API Key` 组合开启 Codex CLI 模式；取消后，同一组合不再重复询问。
 
-应用支持通过 URL 查询参数快速填充配置，非常适合书签或分享给他人使用：
+应用支持通过 URL 查询参数快速填充**非受管字段**配置：
 - `?apiUrl=https://你的代理地址.com`
-- `?apiKey=sk-xxxx`
 - `?apiMode=images` 或 `?apiMode=responses`，未传时默认使用 `images`
 - `?codexCli=true` 或 `?codexCli=false`，未传时默认关闭，仅 `true` 会开启 Codex CLI 模式
 
