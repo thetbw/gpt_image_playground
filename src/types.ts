@@ -21,16 +21,30 @@ export interface AppSettings {
   managedConfig: ManagedConfig
 }
 
-const DEFAULT_BASE_URL = import.meta.env.VITE_DEFAULT_API_URL?.trim() || 'https://api.openai.com/v1'
+function readRuntimeEnv(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim()
+  if (!trimmed || /^__VITE_.+_PLACEHOLDER__$/.test(trimmed)) return fallback
+  return trimmed
+}
+
+function readRuntimeBoolean(value: string | undefined): boolean {
+  return value === 'true'
+}
+
+function readRuntimeApiMode(value: string | undefined): ApiMode {
+  return value === 'responses' ? 'responses' : 'images'
+}
+
+const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL, 'https://api.openai.com/v1')
 export const DEFAULT_IMAGES_MODEL = 'gpt-image-2'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 
 export const DEFAULT_MANAGED_CONFIG: ManagedConfig = {
-  managedApiUrl: import.meta.env.VITE_MANAGED_API_URL === 'true',
-  managedApiKey: import.meta.env.VITE_MANAGED_API_KEY === 'true',
-  managedCodexCli: import.meta.env.VITE_MANAGED_CODEX_CLI === 'true',
-  managedApiMode: import.meta.env.VITE_MANAGED_API_MODE === 'true',
-  managedProxyAuth: import.meta.env.VITE_MANAGED_PROXY_AUTH === 'true',
+  managedApiUrl: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_URL),
+  managedApiKey: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_KEY),
+  managedCodexCli: readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI),
+  managedApiMode: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_MODE),
+  managedProxyAuth: readRuntimeBoolean(import.meta.env.VITE_MANAGED_PROXY_AUTH),
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -38,9 +52,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   model: DEFAULT_IMAGES_MODEL,
   timeout: 300,
-  apiMode: 'images',
-  codexCli: false,
-  apiProxy: false,
+  apiMode: DEFAULT_MANAGED_CONFIG.managedApiMode
+    ? readRuntimeApiMode(import.meta.env.VITE_MANAGED_API_MODE_VALUE)
+    : 'images',
+  codexCli: DEFAULT_MANAGED_CONFIG.managedCodexCli
+    ? readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI_VALUE)
+    : false,
+  apiProxy: DEFAULT_MANAGED_CONFIG.managedApiUrl || DEFAULT_MANAGED_CONFIG.managedProxyAuth,
   managedConfig: DEFAULT_MANAGED_CONFIG,
 }
 

@@ -106,7 +106,7 @@ describe('access gate state', () => {
   })
 
   it('restores access from session storage after refresh by design', async () => {
-    const { readAccessSession, writeAccessSession } = await import('./components/AccessGateModal')
+    const { readAccessSession, writeAccessSession } = await import('./lib/accessGate')
     writeAccessSession(true)
     expect(readAccessSession()).toBe(true)
   })
@@ -126,5 +126,25 @@ describe('managed settings merge', () => {
 
     useStore.getState().setSettings({ apiMode: 'responses' })
     expect(useStore.getState().settings.managedConfig.managedApiUrl).toBe(true)
+  })
+
+  it('keeps managed proxy auth out of browser settings', () => {
+    useStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'local-key',
+        apiProxy: false,
+        managedConfig: {
+          ...DEFAULT_SETTINGS.managedConfig,
+          managedApiKey: true,
+          managedProxyAuth: true,
+        },
+      },
+    })
+
+    useStore.getState().setSettings({ apiKey: 'changed-key', apiProxy: false })
+    expect(useStore.getState().settings.apiKey).toBe('')
+    expect(useStore.getState().settings.apiProxy).toBe(true)
+    expect(useStore.getState().settings.managedConfig.managedProxyAuth).toBe(true)
   })
 })

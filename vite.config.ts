@@ -31,7 +31,9 @@ export default defineConfig(({ command }) => {
       'import.meta.env.VITE_MANAGED_API_URL': JSON.stringify(process.env.VITE_MANAGED_API_URL ?? '__VITE_MANAGED_API_URL_PLACEHOLDER__'),
       'import.meta.env.VITE_MANAGED_API_KEY': JSON.stringify(process.env.VITE_MANAGED_API_KEY ?? '__VITE_MANAGED_API_KEY_PLACEHOLDER__'),
       'import.meta.env.VITE_MANAGED_CODEX_CLI': JSON.stringify(process.env.VITE_MANAGED_CODEX_CLI ?? '__VITE_MANAGED_CODEX_CLI_PLACEHOLDER__'),
+      'import.meta.env.VITE_MANAGED_CODEX_CLI_VALUE': JSON.stringify(process.env.VITE_MANAGED_CODEX_CLI_VALUE ?? '__VITE_MANAGED_CODEX_CLI_VALUE_PLACEHOLDER__'),
       'import.meta.env.VITE_MANAGED_API_MODE': JSON.stringify(process.env.VITE_MANAGED_API_MODE ?? '__VITE_MANAGED_API_MODE_PLACEHOLDER__'),
+      'import.meta.env.VITE_MANAGED_API_MODE_VALUE': JSON.stringify(process.env.VITE_MANAGED_API_MODE_VALUE ?? '__VITE_MANAGED_API_MODE_VALUE_PLACEHOLDER__'),
       'import.meta.env.VITE_MANAGED_PROXY_AUTH': JSON.stringify(process.env.VITE_MANAGED_PROXY_AUTH ?? '__VITE_MANAGED_PROXY_AUTH_PLACEHOLDER__'),
     },
     server: {

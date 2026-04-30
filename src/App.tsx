@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { initStore } from './store'
 import { useStore } from './store'
 import { normalizeBaseUrl } from './lib/api'
@@ -14,7 +14,8 @@ import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
-import AccessGateModal, { readAccessSession } from './components/AccessGateModal'
+import AccessGateModal from './components/AccessGateModal'
+import { isAccessGateRequired, readAccessPassword, readAccessSession, writeAccessPassword, writeAccessSession } from './lib/accessGate'
 
 export function getUrlSettingsOverrides(search: string, settings: AppSettings): Partial<AppSettings> {
   const searchParams = new URLSearchParams(search)
@@ -43,8 +44,10 @@ export default function App() {
   const setSettings = useStore((s) => s.setSettings)
   const isAccessGranted = useStore((s) => s.isAccessGranted)
   const setAccessGranted = useStore((s) => s.setAccessGranted)
+  const [accessChecked, setAccessChecked] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     const searchParams = new URLSearchParams(window.location.search)
     const nextSettings = getUrlSettingsOverrides(window.location.search, useStore.getState().settings)
     setSettings(nextSettings)
@@ -60,8 +63,29 @@ export default function App() {
       window.history.replaceState(null, '', nextUrl)
     }
 
-    setAccessGranted(readAccessSession())
+    const initAccessGate = async () => {
+      if (readAccessSession() && readAccessPassword()) {
+        if (!cancelled) {
+          setAccessGranted(true)
+          setAccessChecked(true)
+        }
+        return
+      }
+
+      const required = await isAccessGateRequired()
+      if (!cancelled) {
+        setAccessGranted(!required)
+        if (!required) {
+          writeAccessSession(false)
+          writeAccessPassword('')
+        }
+        setAccessChecked(true)
+      }
+    }
+
+    void initAccessGate()
     initStore()
+    return () => { cancelled = true }
   }, [setSettings, setAccessGranted])
 
   useEffect(() => {
@@ -74,6 +98,10 @@ export default function App() {
     document.addEventListener('dragstart', preventPageImageDrag)
     return () => document.removeEventListener('dragstart', preventPageImageDrag)
   }, [])
+
+  if (!accessChecked) {
+    return <div className="min-h-screen bg-gray-50 dark:bg-gray-950" />
+  }
 
   if (!isAccessGranted) {
     return (

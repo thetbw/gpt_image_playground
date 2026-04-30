@@ -1,17 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { useStore } from '../store'
-
-const SESSION_KEY = 'access-granted'
-
-export function readAccessSession(): boolean {
-  return sessionStorage.getItem(SESSION_KEY) === '1'
-}
-
-export function writeAccessSession(granted: boolean) {
-  if (granted) sessionStorage.setItem(SESSION_KEY, '1')
-  else sessionStorage.removeItem(SESSION_KEY)
-}
+import { readAccessSession, writeAccessPassword, writeAccessSession } from '../lib/accessGate'
 
 export default function AccessGateModal() {
   const setAccessGranted = useStore((s) => s.setAccessGranted)
@@ -33,13 +23,15 @@ export default function AccessGateModal() {
     try {
       const res = await fetch('/auth/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: password,
+        headers: { 'X-Access-Password': password },
       })
       if (!res.ok) throw new Error('密码错误，请重试')
       setAccessGranted(true)
       writeAccessSession(true)
+      writeAccessPassword(password)
     } catch (e) {
+      writeAccessSession(false)
+      writeAccessPassword('')
       setError(e instanceof Error ? e.message : '校验失败，请重试')
       setShake(true)
       setTimeout(() => setShake(false), 300)

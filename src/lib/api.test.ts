@@ -2,10 +2,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS, DEFAULT_SETTINGS } from '../types'
 import { callImageApi } from './api'
 
+class MemorySessionStorage {
+  private storage = new Map<string, string>()
+  getItem(key: string) { return this.storage.get(key) ?? null }
+  setItem(key: string, value: string) { this.storage.set(key, value) }
+  removeItem(key: string) { this.storage.delete(key) }
+  clear() { this.storage.clear() }
+}
+
 describe('callImageApi', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
   it('records actual params returned on Images API responses in Codex CLI mode', async () => {
@@ -146,5 +155,57 @@ describe('callImageApi', () => {
 
     const [, init] = fetchMock.mock.calls[0]
     expect((init as RequestInit).headers).not.toMatchObject({ Authorization: expect.any(String) })
+  })
+
+  it('forces same-origin proxy when managed proxy auth is enabled', async () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: '',
+        apiProxy: false,
+        managedConfig: {
+          ...DEFAULT_SETTINGS.managedConfig,
+          managedProxyAuth: true,
+        },
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api-proxy/images/generations',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    expect((init as RequestInit).headers).not.toMatchObject({ Authorization: expect.any(String) })
+  })
+
+  it('adds the access password only to same-origin proxy requests', async () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
+    vi.stubGlobal('sessionStorage', new MemorySessionStorage())
+    sessionStorage.setItem('access-password', 'pw123')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'test-key',
+        apiProxy: true,
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect((init as RequestInit).headers).toMatchObject({ 'X-Access-Password': 'pw123' })
   })
 })

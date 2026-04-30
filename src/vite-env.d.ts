@@ -9,7 +9,9 @@ interface ImportMetaEnv {
   readonly VITE_MANAGED_API_URL?: string
   readonly VITE_MANAGED_API_KEY?: string
   readonly VITE_MANAGED_CODEX_CLI?: string
+  readonly VITE_MANAGED_CODEX_CLI_VALUE?: string
   readonly VITE_MANAGED_API_MODE?: string
+  readonly VITE_MANAGED_API_MODE_VALUE?: string
   readonly VITE_MANAGED_PROXY_AUTH?: string
 }
 

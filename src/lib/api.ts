@@ -1,5 +1,6 @@
 import type { AppSettings, ImageApiResponse, ResponsesApiResponse, TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
+import { readAccessPassword } from './accessGate'
 import { buildApiUrl, isApiProxyAvailable, readClientDevProxyConfig } from './devProxy'
 
 const MIME_MAP: Record<string, string> = {
@@ -97,7 +98,7 @@ async function getApiErrorMessage(response: Response): Promise<string> {
   return errorMsg
 }
 
-function createRequestHeaders(settings: AppSettings): Record<string, string> {
+function createRequestHeaders(settings: AppSettings, includeAccessPassword = false): Record<string, string> {
   const headers: Record<string, string> = {
     'Cache-Control': 'no-store, no-cache, max-age=0',
     Pragma: 'no-cache',
@@ -105,7 +106,20 @@ function createRequestHeaders(settings: AppSettings): Record<string, string> {
   if (!settings.managedConfig.managedProxyAuth) {
     headers.Authorization = `Bearer ${settings.apiKey}`
   }
+  if (includeAccessPassword) {
+    const accessPassword = readAccessPassword()
+    if (accessPassword) headers['X-Access-Password'] = accessPassword
+  }
   return headers
+}
+
+function shouldUseApiProxy(settings: AppSettings): boolean {
+  const proxyConfig = readClientDevProxyConfig()
+  return (
+    settings.apiProxy ||
+    settings.managedConfig.managedApiUrl ||
+    settings.managedConfig.managedProxyAuth
+  ) && isApiProxyAvailable(proxyConfig)
 }
 
 function createResponsesImageTool(
@@ -286,8 +300,8 @@ async function callImagesApiSingle(opts: CallApiOptions): Promise<CallApiResult>
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = settings.apiProxy && isApiProxyAvailable(proxyConfig)
-  const requestHeaders = createRequestHeaders(settings)
+  const useApiProxy = shouldUseApiProxy(settings)
+  const requestHeaders = createRequestHeaders(settings, useApiProxy)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), settings.timeout * 1000)
@@ -463,8 +477,8 @@ async function callResponsesImageApiSingle(opts: CallApiOptions): Promise<CallAp
   const { settings, prompt, params, inputImageDataUrls } = opts
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = settings.apiProxy && isApiProxyAvailable(proxyConfig)
-  const requestHeaders = createRequestHeaders(settings)
+  const useApiProxy = shouldUseApiProxy(settings)
+  const requestHeaders = createRequestHeaders(settings, useApiProxy)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), settings.timeout * 1000)
 

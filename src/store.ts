@@ -57,6 +57,23 @@ function orderImagesWithMaskFirst(images: InputImage[], maskTargetImageId: strin
   return next
 }
 
+function hasApiCredential(settings: AppSettings): boolean {
+  return Boolean(settings.apiKey || settings.managedConfig.managedProxyAuth)
+}
+
+function applyRuntimeManagedSettings(settings: AppSettings, managedConfig = settings.managedConfig): AppSettings {
+  return {
+    ...settings,
+    apiKey: managedConfig.managedApiKey || managedConfig.managedProxyAuth ? '' : settings.apiKey,
+    apiMode: managedConfig.managedApiMode ? DEFAULT_SETTINGS.apiMode : settings.apiMode,
+    codexCli: managedConfig.managedCodexCli ? DEFAULT_SETTINGS.codexCli : settings.codexCli,
+    apiProxy: managedConfig.managedApiUrl || managedConfig.managedProxyAuth
+      ? true
+      : settings.apiProxy,
+    managedConfig,
+  }
+}
+
 // ===== Store 类型 =====
 
 interface AppState {
@@ -137,20 +154,17 @@ export const useStore = create<AppState>()(
       // Settings
       settings: { ...DEFAULT_SETTINGS },
       setSettings: (s) => set((st) => ({
-        settings: {
+        settings: applyRuntimeManagedSettings({
           ...st.settings,
           ...s,
-          managedConfig: {
-            ...st.settings.managedConfig,
-            ...s.managedConfig,
-          },
+          managedConfig: st.settings.managedConfig,
           apiMode:
             s.apiMode === 'images' || s.apiMode === 'responses'
               ? s.apiMode
               : st.settings.apiMode ?? DEFAULT_SETTINGS.apiMode,
           codexCli: s.codexCli ?? st.settings.codexCli ?? DEFAULT_SETTINGS.codexCli,
           apiProxy: s.apiProxy ?? st.settings.apiProxy ?? DEFAULT_SETTINGS.apiProxy,
-        },
+        }, st.settings.managedConfig),
       })),
       dismissedCodexCliPrompts: [],
       dismissCodexCliPrompt: (key) => set((st) => ({
@@ -281,6 +295,26 @@ export const useStore = create<AppState>()(
         params: state.params,
         dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
       }),
+      merge: (persisted, current) => {
+        const persistedState = persisted as Partial<AppState> | undefined
+        const persistedSettings = persistedState?.settings
+        const settings = applyRuntimeManagedSettings({
+          ...DEFAULT_SETTINGS,
+          ...persistedSettings,
+          managedConfig: DEFAULT_SETTINGS.managedConfig,
+        }, DEFAULT_SETTINGS.managedConfig)
+
+        return {
+          ...current,
+          ...persistedState,
+          settings,
+          params: {
+            ...current.params,
+            ...persistedState?.params,
+          },
+          dismissedCodexCliPrompts: persistedState?.dismissedCodexCliPrompts ?? current.dismissedCodexCliPrompts,
+        }
+      },
     },
   ),
 )
@@ -352,7 +386,7 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
   const { settings, prompt, inputImages, maskDraft, params, showToast, setConfirmDialog } =
     useStore.getState()
 
-  if (!settings.apiKey) {
+  if (!hasApiCredential(settings)) {
     showToast('请先在设置中配置 API Key', 'error')
     useStore.getState().setShowSettings(true)
     return

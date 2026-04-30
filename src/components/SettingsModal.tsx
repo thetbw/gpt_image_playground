@@ -17,8 +17,9 @@ export default function SettingsModal() {
   const [timeoutInput, setTimeoutInput] = useState(String(settings.timeout))
   const [showApiKey, setShowApiKey] = useState(false)
   const apiProxyAvailable = isApiProxyAvailable(readClientDevProxyConfig())
-  const apiProxyEnabled = apiProxyAvailable && draft.apiProxy
   const managed = settings.managedConfig
+  const managedProxy = managed.managedApiUrl || managed.managedProxyAuth
+  const apiProxyEnabled = apiProxyAvailable && (draft.apiProxy || managedProxy)
 
   const getDefaultModelForMode = (apiMode: AppSettings['apiMode']) =>
     apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
@@ -165,20 +166,22 @@ export default function SettingsModal() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (managedProxy) return
                         const nextDraft = { ...draft, apiProxy: !draft.apiProxy }
                         setDraft(nextDraft)
                         commitSettings(nextDraft)
                       }}
-                      className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${draft.apiProxy ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      disabled={managedProxy}
+                      className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${managedProxy ? 'cursor-not-allowed opacity-60' : ''} ${(draft.apiProxy || managedProxy) ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                       role="switch"
-                      aria-checked={draft.apiProxy}
+                      aria-checked={draft.apiProxy || managedProxy}
                       aria-label="API 代理"
                     >
-                      <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition-transform ${draft.apiProxy ? 'translate-x-[11px]' : 'translate-x-[2px]'}`} />
+                      <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition-transform ${(draft.apiProxy || managedProxy) ? 'translate-x-[11px]' : 'translate-x-[2px]'}`} />
                     </button>
                   </div>
                   <div data-selectable-text className="text-[10px] text-gray-400 dark:text-gray-500">
-                    由当前部署提供同源代理，用于解决浏览器跨域限制；开启后 API URL 设置会被忽略。
+                    {managedProxy ? '由部署端托管，请求会通过同源代理转发。' : '由当前部署提供同源代理，用于解决浏览器跨域限制；开启后 API URL 设置会被忽略。'}
                   </div>
                 </div>
               )}
