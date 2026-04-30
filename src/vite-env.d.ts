@@ -18,3 +18,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  readonly __GPT_IMAGE_PLAYGROUND_CONFIG__?: import('./lib/runtimeConfig').RuntimeConfig
+}

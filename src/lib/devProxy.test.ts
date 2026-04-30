@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { buildApiUrl } from './devProxy'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildApiUrl, isApiProxyAvailable } from './devProxy'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('buildApiUrl', () => {
   it('uses the same-origin proxy prefix when API proxy is enabled', () => {
@@ -35,5 +39,15 @@ describe('buildApiUrl', () => {
     expect(buildApiUrl('http://api.example.com/v1', 'responses', null, false)).toBe(
       'http://api.example.com/v1/responses',
     )
+  })
+
+  it('reads proxy availability from runtime config', () => {
+    vi.stubGlobal('window', {
+      __GPT_IMAGE_PLAYGROUND_CONFIG__: {
+        apiProxyAvailable: true,
+      },
+    })
+
+    expect(isApiProxyAvailable(null)).toBe(true)
   })
 })

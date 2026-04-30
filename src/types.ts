@@ -1,3 +1,5 @@
+import { readRuntimeConfig } from './lib/runtimeConfig'
+
 // ===== 设置 =====
 
 export type ApiMode = 'images' | 'responses'
@@ -21,13 +23,14 @@ export interface AppSettings {
   managedConfig: ManagedConfig
 }
 
-function readRuntimeEnv(value: string | undefined, fallback: string): string {
-  const trimmed = value?.trim()
+function readRuntimeEnv(value: string | undefined, fallback: string, runtimeValue?: string): string {
+  const trimmed = runtimeValue?.trim() || value?.trim()
   if (!trimmed || /^__VITE_.+_PLACEHOLDER__$/.test(trimmed)) return fallback
   return trimmed
 }
 
-function readRuntimeBoolean(value: string | undefined): boolean {
+function readRuntimeBoolean(value: string | undefined, runtimeValue?: boolean): boolean {
+  if (typeof runtimeValue === 'boolean') return runtimeValue
   return value === 'true'
 }
 
@@ -35,16 +38,21 @@ function readRuntimeApiMode(value: string | undefined): ApiMode {
   return value === 'responses' ? 'responses' : 'images'
 }
 
-const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL, 'https://api.openai.com/v1')
+const runtimeConfig = readRuntimeConfig()
+const DEFAULT_BASE_URL = readRuntimeEnv(
+  import.meta.env.VITE_DEFAULT_API_URL,
+  'https://api.openai.com/v1',
+  runtimeConfig.defaultApiUrl,
+)
 export const DEFAULT_IMAGES_MODEL = 'gpt-image-2'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 
 export const DEFAULT_MANAGED_CONFIG: ManagedConfig = {
-  managedApiUrl: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_URL),
-  managedApiKey: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_KEY),
-  managedCodexCli: readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI),
-  managedApiMode: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_MODE),
-  managedProxyAuth: readRuntimeBoolean(import.meta.env.VITE_MANAGED_PROXY_AUTH),
+  managedApiUrl: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_URL, runtimeConfig.managedApiUrl),
+  managedApiKey: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_KEY, runtimeConfig.managedApiKey),
+  managedCodexCli: readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI, runtimeConfig.managedCodexCli),
+  managedApiMode: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_MODE, runtimeConfig.managedApiMode),
+  managedProxyAuth: readRuntimeBoolean(import.meta.env.VITE_MANAGED_PROXY_AUTH, runtimeConfig.managedProxyAuth),
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -53,10 +61,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: DEFAULT_IMAGES_MODEL,
   timeout: 300,
   apiMode: DEFAULT_MANAGED_CONFIG.managedApiMode
-    ? readRuntimeApiMode(import.meta.env.VITE_MANAGED_API_MODE_VALUE)
+    ? readRuntimeApiMode(runtimeConfig.managedApiModeValue ?? import.meta.env.VITE_MANAGED_API_MODE_VALUE)
     : 'images',
   codexCli: DEFAULT_MANAGED_CONFIG.managedCodexCli
-    ? readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI_VALUE)
+    ? readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI_VALUE, runtimeConfig.managedCodexCliValue)
     : false,
   apiProxy: DEFAULT_MANAGED_CONFIG.managedApiUrl || DEFAULT_MANAGED_CONFIG.managedProxyAuth,
   managedConfig: DEFAULT_MANAGED_CONFIG,

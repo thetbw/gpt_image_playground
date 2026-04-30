@@ -46,11 +46,29 @@ escape_sed_replacement() {
     printf '%s' "$1" | sed 's/[&|]/\\&/g'
 }
 
+escape_js_string() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 replace_js_placeholder() {
     placeholder=$1
     value=$(escape_sed_replacement "$2")
     find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|$placeholder|$value|g" {} +
 }
+
+cat > /usr/share/nginx/html/runtime-config.js <<EOF
+window.__GPT_IMAGE_PLAYGROUND_CONFIG__ = Object.freeze({
+  defaultApiUrl: "$(escape_js_string "$CLIENT_API_URL")",
+  apiProxyAvailable: $API_PROXY_AVAILABLE,
+  managedApiUrl: $MANAGED_API_URL_FLAG,
+  managedApiKey: $MANAGED_API_KEY_FLAG,
+  managedCodexCli: $MANAGED_CODEX_CLI_FLAG,
+  managedCodexCliValue: $MANAGED_CODEX_CLI_VALUE,
+  managedApiMode: $MANAGED_API_MODE_FLAG,
+  managedApiModeValue: "$(escape_js_string "$MANAGED_API_MODE_VALUE")",
+  managedProxyAuth: $MANAGED_PROXY_AUTH_FLAG
+});
+EOF
 
 replace_js_placeholder "__VITE_DEFAULT_API_URL_PLACEHOLDER__" "$CLIENT_API_URL"
 replace_js_placeholder "__VITE_API_PROXY_AVAILABLE_PLACEHOLDER__" "$API_PROXY_AVAILABLE"
