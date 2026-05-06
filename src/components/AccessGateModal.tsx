@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { useStore } from '../store'
-import { readAccessSession, writeAccessPassword, writeAccessSession } from '../lib/accessGate'
+import { clearAccessState, writeAccessPassword, writeAccessSession } from '../lib/accessGate'
 
 export default function AccessGateModal() {
   const setAccessGranted = useStore((s) => s.setAccessGranted)
@@ -9,10 +9,6 @@ export default function AccessGateModal() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [shake, setShake] = useState(false)
-
-  useEffect(() => {
-    if (readAccessSession()) setAccessGranted(true)
-  }, [setAccessGranted])
 
   const cardClass = useMemo(() => `relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-6 shadow-2xl ring-1 ring-black/5 dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10 ${shake ? 'animate-[shake_0.28s_ease-in-out]' : ''}`, [shake])
 
@@ -30,8 +26,7 @@ export default function AccessGateModal() {
       writeAccessSession(true)
       writeAccessPassword(password)
     } catch (e) {
-      writeAccessSession(false)
-      writeAccessPassword('')
+      clearAccessState()
       setError(e instanceof Error ? e.message : '校验失败，请重试')
       setShake(true)
       setTimeout(() => setShake(false), 300)

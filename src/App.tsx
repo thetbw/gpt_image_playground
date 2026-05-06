@@ -16,7 +16,7 @@ import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
 import AccessGateModal from './components/AccessGateModal'
 import AnnouncementModal from './components/AnnouncementModal'
-import { isAccessGateRequired, readAccessPassword, readAccessSession, writeAccessPassword, writeAccessSession } from './lib/accessGate'
+import { resolveInitialAccessGrant, subscribeToAccessUnauthorized } from './lib/accessGate'
 import { fetchAnnouncementIndex } from './lib/announcements'
 
 export function getUrlSettingsOverrides(search: string, settings: AppSettings): Partial<AppSettings> {
@@ -72,29 +72,24 @@ export default function App() {
       window.history.replaceState(null, '', nextUrl)
     }
 
-    const initAccessGate = async () => {
-      if (readAccessSession() && readAccessPassword()) {
-        if (!cancelled) {
-          setAccessGranted(true)
-          setAccessChecked(true)
-        }
-        return
-      }
+    const unsubscribe = subscribeToAccessUnauthorized(() => {
+      setAccessGranted(false)
+    })
 
-      const required = await isAccessGateRequired()
+    const initAccessGate = async () => {
+      const granted = await resolveInitialAccessGrant()
       if (!cancelled) {
-        setAccessGranted(!required)
-        if (!required) {
-          writeAccessSession(false)
-          writeAccessPassword('')
-        }
+        setAccessGranted(granted)
         setAccessChecked(true)
       }
     }
 
     void initAccessGate()
     initStore()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [setSettings, setAccessGranted])
 
   useEffect(() => {

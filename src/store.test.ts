@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS, DEFAULT_SETTINGS } from './types'
 import type { TaskRecord } from './types'
 import { editOutputs, submitTask, useStore } from './store'
+import { clearAccessState } from './lib/accessGate'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
 
@@ -92,6 +93,7 @@ describe('access gate state', () => {
     })
     vi.stubGlobal('sessionStorage', new MemorySessionStorage())
     sessionStorage.clear()
+    clearAccessState()
   })
 
   it('toggles access gate state', () => {
@@ -105,10 +107,14 @@ describe('access gate state', () => {
     expect(useStore.getState().isAccessGranted).toBe(false)
   })
 
-  it('restores access from session storage after refresh by design', async () => {
-    const { readAccessSession, writeAccessSession } = await import('./lib/accessGate')
+  it('keeps gate state only in runtime memory', async () => {
+    const { readAccessPassword, readAccessSession, writeAccessPassword, writeAccessSession } = await import('./lib/accessGate')
     writeAccessSession(true)
+    writeAccessPassword('pw123')
     expect(readAccessSession()).toBe(true)
+    expect(readAccessPassword()).toBe('pw123')
+    expect(sessionStorage.getItem('access-granted')).toBeNull()
+    expect(sessionStorage.getItem('access-password')).toBeNull()
   })
 })
 

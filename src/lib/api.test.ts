@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS, DEFAULT_SETTINGS } from '../types'
+import {
+  clearAccessState,
+  readAccessPassword,
+  readAccessSession,
+  subscribeToAccessUnauthorized,
+  writeAccessPassword,
+  writeAccessSession,
+} from './accessGate'
 import { callImageApi } from './api'
 
 class MemorySessionStorage {
@@ -12,6 +20,7 @@ class MemorySessionStorage {
 
 describe('callImageApi', () => {
   afterEach(() => {
+    clearAccessState()
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
@@ -189,7 +198,7 @@ describe('callImageApi', () => {
   it('adds the access password only to same-origin proxy requests', async () => {
     vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
     vi.stubGlobal('sessionStorage', new MemorySessionStorage())
-    sessionStorage.setItem('access-password', 'pw123')
+    writeAccessPassword('pw123')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       data: [{ b64_json: 'aW1hZ2U=' }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
@@ -207,5 +216,100 @@ describe('callImageApi', () => {
 
     const [, init] = fetchMock.mock.calls[0]
     expect((init as RequestInit).headers).toMatchObject({ 'X-Access-Password': 'pw123' })
+  })
+
+  it('clears runtime access and notifies listeners when proxy auth returns an empty 401', async () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
+    let unauthorizedCalls = 0
+    const unsubscribe = subscribeToAccessUnauthorized(() => {
+      unauthorizedCalls += 1
+    })
+    writeAccessSession(true)
+    writeAccessPassword('pw123')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
+      status: 401,
+      headers: { 'Content-Length': '0' },
+    }))
+
+    await expect(callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'test-key',
+        apiProxy: true,
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })).rejects.toThrow('访问密码已失效，请重新输入')
+
+    unsubscribe()
+    expect(unauthorizedCalls).toBe(1)
+    expect(readAccessSession()).toBe(false)
+    expect(readAccessPassword()).toBe('')
+  })
+
+  it('treats nginx html 401 responses as expired access-password failures', async () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
+    let unauthorizedCalls = 0
+    const unsubscribe = subscribeToAccessUnauthorized(() => {
+      unauthorizedCalls += 1
+    })
+    writeAccessSession(true)
+    writeAccessPassword('pw123')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('<html><body><h1>401 Unauthorized</h1></body></html>', {
+      status: 401,
+      headers: {
+        'Content-Type': 'text/html',
+        'Content-Length': '179',
+      },
+    }))
+
+    await expect(callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'test-key',
+        apiProxy: true,
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })).rejects.toThrow('访问密码已失效，请重新输入')
+
+    unsubscribe()
+    expect(unauthorizedCalls).toBe(1)
+    expect(readAccessSession()).toBe(false)
+    expect(readAccessPassword()).toBe('')
+  })
+
+  it('preserves runtime access when upstream returns a normal JSON 401 error', async () => {
+    vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
+    let unauthorizedCalls = 0
+    const unsubscribe = subscribeToAccessUnauthorized(() => {
+      unauthorizedCalls += 1
+    })
+    writeAccessSession(true)
+    writeAccessPassword('pw123')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      error: { message: 'upstream unauthorized' },
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(callImageApi({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKey: 'test-key',
+        apiProxy: true,
+      },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })).rejects.toThrow('upstream unauthorized')
+
+    unsubscribe()
+    expect(unauthorizedCalls).toBe(0)
+    expect(readAccessSession()).toBe(true)
+    expect(readAccessPassword()).toBe('pw123')
   })
 })

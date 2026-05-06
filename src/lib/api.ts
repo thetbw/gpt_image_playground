@@ -1,6 +1,6 @@
 import type { AppSettings, ImageApiResponse, ResponsesApiResponse, TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
-import { readAccessPassword } from './accessGate'
+import { invalidateAccess, readAccessPassword } from './accessGate'
 import { buildApiUrl, isApiProxyAvailable, readClientDevProxyConfig } from './devProxy'
 
 const MIME_MAP: Record<string, string> = {
@@ -96,6 +96,29 @@ async function getApiErrorMessage(response: Response): Promise<string> {
     }
   }
   return errorMsg
+}
+
+async function isAccessGateUnauthorizedResponse(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (contentType.includes('application/json')) return false
+
+  const contentLength = response.headers.get('content-length')
+  if (contentLength === '0') return true
+  if (!contentType || contentType.includes('text/html') || contentType.includes('text/plain')) return true
+
+  try {
+    return (await response.clone().text()).trim() === ''
+  } catch {
+    return false
+  }
+}
+
+async function throwIfAccessGateUnauthorized(response: Response, usingApiProxy: boolean) {
+  if (!usingApiProxy || !(await isAccessGateUnauthorizedResponse(response))) return
+  invalidateAccess()
+  throw new Error('访问密码已失效，请重新输入')
 }
 
 function createRequestHeaders(settings: AppSettings, includeAccessPassword = false): Record<string, string> {
@@ -396,6 +419,7 @@ async function callImagesApiSingle(opts: CallApiOptions): Promise<CallApiResult>
     }
 
     if (!response.ok) {
+      await throwIfAccessGateUnauthorized(response, useApiProxy)
       throw new Error(await getApiErrorMessage(response))
     }
 
@@ -511,6 +535,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions): Promise<CallAp
     })
 
     if (!response.ok) {
+      await throwIfAccessGateUnauthorized(response, useApiProxy)
       throw new Error(await getApiErrorMessage(response))
     }
 

@@ -1,34 +1,43 @@
-const SESSION_KEY = 'access-granted'
-const PASSWORD_KEY = 'access-password'
+let accessGranted = false
+let accessPassword = ''
 
-function getSessionStorage(): Storage | null {
-  try {
-    return typeof sessionStorage === 'undefined' ? null : sessionStorage
-  } catch {
-    return null
-  }
-}
+const unauthorizedListeners = new Set<() => void>()
 
 export function readAccessSession(): boolean {
-  return getSessionStorage()?.getItem(SESSION_KEY) === '1'
+  return accessGranted
 }
 
 export function writeAccessSession(granted: boolean) {
-  const storage = getSessionStorage()
-  if (!storage) return
-  if (granted) storage.setItem(SESSION_KEY, '1')
-  else storage.removeItem(SESSION_KEY)
+  accessGranted = granted
 }
 
 export function readAccessPassword(): string {
-  return getSessionStorage()?.getItem(PASSWORD_KEY) ?? ''
+  return accessPassword
 }
 
 export function writeAccessPassword(password: string) {
-  const storage = getSessionStorage()
-  if (!storage) return
-  if (password) storage.setItem(PASSWORD_KEY, password)
-  else storage.removeItem(PASSWORD_KEY)
+  accessPassword = password
+}
+
+export function clearAccessState() {
+  accessGranted = false
+  accessPassword = ''
+}
+
+export async function resolveInitialAccessGrant(): Promise<boolean> {
+  const required = await isAccessGateRequired()
+  clearAccessState()
+  return !required
+}
+
+export function subscribeToAccessUnauthorized(listener: () => void) {
+  unauthorizedListeners.add(listener)
+  return () => unauthorizedListeners.delete(listener)
+}
+
+export function invalidateAccess() {
+  clearAccessState()
+  for (const listener of unauthorizedListeners) listener()
 }
 
 export async function isAccessGateRequired(): Promise<boolean> {
