@@ -23,6 +23,7 @@ import {
   hashDataUrl,
 } from './lib/db'
 import { callImageApi } from './lib/api'
+import type { AnnouncementSummary } from './lib/announcements'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
 import { normalizeImageSize } from './lib/size'
@@ -82,6 +83,8 @@ interface AppState {
   setSettings: (s: Partial<AppSettings>) => void
   dismissedCodexCliPrompts: string[]
   dismissCodexCliPrompt: (key: string) => void
+  dismissedAnnouncementIds: string[]
+  dismissAnnouncement: (id: string) => void
 
   // 输入
   prompt: string
@@ -128,6 +131,12 @@ interface AppState {
   setLightboxImageId: (id: string | null, list?: string[]) => void
   showSettings: boolean
   setShowSettings: (v: boolean) => void
+  announcements: AnnouncementSummary[]
+  setAnnouncements: (announcements: AnnouncementSummary[]) => void
+  selectedAnnouncementId: string | null
+  setSelectedAnnouncementId: (id: string | null) => void
+  showAnnouncementModal: boolean
+  setShowAnnouncementModal: (v: boolean) => void
   isAccessGranted: boolean
   setAccessGranted: (granted: boolean) => void
 
@@ -171,6 +180,12 @@ export const useStore = create<AppState>()(
         dismissedCodexCliPrompts: st.dismissedCodexCliPrompts.includes(key)
           ? st.dismissedCodexCliPrompts
           : [...st.dismissedCodexCliPrompts, key],
+      })),
+      dismissedAnnouncementIds: [],
+      dismissAnnouncement: (id) => set((st) => ({
+        dismissedAnnouncementIds: st.dismissedAnnouncementIds.includes(id)
+          ? st.dismissedAnnouncementIds
+          : [...st.dismissedAnnouncementIds, id],
       })),
 
       // Input
@@ -272,6 +287,12 @@ export const useStore = create<AppState>()(
         set({ lightboxImageId, lightboxImageList: list ?? (lightboxImageId ? [lightboxImageId] : []) }),
       showSettings: false,
       setShowSettings: (showSettings) => set({ showSettings }),
+      announcements: [],
+      setAnnouncements: (announcements) => set({ announcements }),
+      selectedAnnouncementId: null,
+      setSelectedAnnouncementId: (selectedAnnouncementId) => set({ selectedAnnouncementId }),
+      showAnnouncementModal: false,
+      setShowAnnouncementModal: (showAnnouncementModal) => set({ showAnnouncementModal }),
       isAccessGranted: false,
       setAccessGranted: (isAccessGranted) => set({ isAccessGranted }),
 
@@ -294,6 +315,7 @@ export const useStore = create<AppState>()(
         settings: state.settings,
         params: state.params,
         dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
+        dismissedAnnouncementIds: state.dismissedAnnouncementIds,
       }),
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<AppState> | undefined
@@ -313,6 +335,7 @@ export const useStore = create<AppState>()(
             ...persistedState?.params,
           },
           dismissedCodexCliPrompts: persistedState?.dismissedCodexCliPrompts ?? current.dismissedCodexCliPrompts,
+          dismissedAnnouncementIds: persistedState?.dismissedAnnouncementIds ?? current.dismissedAnnouncementIds,
         }
       },
     },

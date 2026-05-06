@@ -28,6 +28,7 @@ ENV MANAGED_API_MODE=
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY deploy/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --chmod=755 deploy/10-normalize-env.envsh /docker-entrypoint.d/10-normalize-env.envsh
+COPY --chmod=755 deploy/20-sync-announcements.sh /docker-entrypoint.d/20-sync-announcements.sh
 COPY --chmod=755 deploy/inject-api-url.sh /docker-entrypoint.d/40-inject-api-url.sh
 
 EXPOSE 80

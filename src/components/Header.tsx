@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { useVersionCheck } from '../hooks/useVersionCheck'
+import { isLatestAnnouncementUnread } from '../lib/announcements'
 import HelpModal from './HelpModal'
 
 export default function Header() {
   const setShowSettings = useStore((s) => s.setShowSettings)
+  const announcements = useStore((s) => s.announcements)
+  const dismissedAnnouncementIds = useStore((s) => s.dismissedAnnouncementIds)
+  const setSelectedAnnouncementId = useStore((s) => s.setSelectedAnnouncementId)
+  const setShowAnnouncementModal = useStore((s) => s.setShowAnnouncementModal)
   const { hasUpdate, latestRelease, dismiss } = useVersionCheck()
   const [showHelp, setShowHelp] = useState(false)
+  const hasUnreadAnnouncement = isLatestAnnouncementUnread(announcements, dismissedAnnouncementIds)
 
   return (
     <header data-no-drag-select className="safe-area-top sticky top-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200 dark:border-white/[0.08]">
@@ -36,6 +42,34 @@ export default function Header() {
           )}
         </div>
         <div className="flex items-center gap-1">
+          {announcements.length > 0 && (
+            <button
+              onClick={() => {
+                setSelectedAnnouncementId(useStore.getState().selectedAnnouncementId ?? announcements[0].id)
+                setShowAnnouncementModal(true)
+              }}
+              className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+              title="查看公告"
+            >
+              <svg
+                className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 11.5v1a1.5 1.5 0 0 0 1.5 1.5H8l6 4V6l-6 4H5.5A1.5 1.5 0 0 0 4 11.5Z" />
+                <path d="M8 14v3a1.5 1.5 0 0 0 3 0v-1.2" />
+                <path d="M17 9.5a3.5 3.5 0 0 1 0 5" />
+                <path d="M19 7a6.5 6.5 0 0 1 0 10" />
+              </svg>
+              {hasUnreadAnnouncement && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-gray-950" />
+              )}
+            </button>
+          )}
           <button
             onClick={() => setShowHelp(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
@@ -50,9 +84,8 @@ export default function Header() {
               strokeLinejoin="round"
               viewBox="0 0 24 24"
             >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <path d="M12 17h.01" />
+              <path d="M12 6.25c-1.75-1.4-4.53-2.25-7-2.25a1 1 0 0 0-1 1v11.5a1 1 0 0 0 1.18.98c2.13-.37 4.58.22 6.82 1.52 2.24-1.3 4.69-1.89 6.82-1.52A1 1 0 0 0 20 16.5V5a1 1 0 0 0-1-1c-2.47 0-5.25.85-7 2.25Z" />
+              <path d="M12 6.25V19" />
             </svg>
           </button>
           <button

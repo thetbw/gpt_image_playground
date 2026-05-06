@@ -15,7 +15,9 @@ import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
 import AccessGateModal from './components/AccessGateModal'
+import AnnouncementModal from './components/AnnouncementModal'
 import { isAccessGateRequired, readAccessPassword, readAccessSession, writeAccessPassword, writeAccessSession } from './lib/accessGate'
+import { fetchAnnouncementIndex } from './lib/announcements'
 
 export function getUrlSettingsOverrides(search: string, settings: AppSettings): Partial<AppSettings> {
   const searchParams = new URLSearchParams(search)
@@ -44,6 +46,13 @@ export default function App() {
   const setSettings = useStore((s) => s.setSettings)
   const isAccessGranted = useStore((s) => s.isAccessGranted)
   const setAccessGranted = useStore((s) => s.setAccessGranted)
+  const announcements = useStore((s) => s.announcements)
+  const setAnnouncements = useStore((s) => s.setAnnouncements)
+  const dismissAnnouncement = useStore((s) => s.dismissAnnouncement)
+  const selectedAnnouncementId = useStore((s) => s.selectedAnnouncementId)
+  const setSelectedAnnouncementId = useStore((s) => s.setSelectedAnnouncementId)
+  const showAnnouncementModal = useStore((s) => s.showAnnouncementModal)
+  const setShowAnnouncementModal = useStore((s) => s.setShowAnnouncementModal)
   const [accessChecked, setAccessChecked] = useState(false)
 
   useEffect(() => {
@@ -99,6 +108,45 @@ export default function App() {
     return () => document.removeEventListener('dragstart', preventPageImageDrag)
   }, [])
 
+  useEffect(() => {
+    if (!accessChecked || !isAccessGranted) return
+
+    let cancelled = false
+
+    fetchAnnouncementIndex().then((items) => {
+      if (cancelled) return
+
+      setAnnouncements(items)
+      const latestAnnouncement = items[0]
+      const currentSelectedId = useStore.getState().selectedAnnouncementId
+      if (!latestAnnouncement) {
+        setSelectedAnnouncementId(null)
+        setShowAnnouncementModal(false)
+        return
+      }
+
+      const nextSelectedId =
+        currentSelectedId && items.some((item) => item.id === currentSelectedId)
+          ? currentSelectedId
+          : latestAnnouncement.id
+      setSelectedAnnouncementId(nextSelectedId)
+
+      if (!useStore.getState().dismissedAnnouncementIds.includes(latestAnnouncement.id)) {
+        setShowAnnouncementModal(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessChecked, isAccessGranted, setAnnouncements, setSelectedAnnouncementId, setShowAnnouncementModal])
+
+  const handleCloseAnnouncementModal = () => {
+    const latestAnnouncement = announcements[0]
+    if (latestAnnouncement) dismissAnnouncement(latestAnnouncement.id)
+    setShowAnnouncementModal(false)
+  }
+
   if (!accessChecked) {
     return <div className="min-h-screen bg-gray-50 dark:bg-gray-950" />
   }
@@ -129,6 +177,14 @@ export default function App() {
       <Toast />
       <MaskEditorModal />
       <ImageContextMenu />
+      {showAnnouncementModal && selectedAnnouncementId && announcements.length > 0 && (
+        <AnnouncementModal
+          announcements={announcements}
+          selectedAnnouncementId={selectedAnnouncementId}
+          onSelect={setSelectedAnnouncementId}
+          onClose={handleCloseAnnouncementModal}
+        />
+      )}
     </>
   )
 }

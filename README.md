@@ -182,6 +182,61 @@ services:
 
 如果使用 bridge 网络并修改了容器内 `PORT`，需要同步调整端口映射，例如 `PORT=28080` 时使用 `"8080:28080"`。使用 host 网络时不要配置 `ports`。
 
+### 挂载目录公告（`/announcements-src`）
+
+容器支持从挂载目录自动读取公告 Markdown 文件。启动时会扫描容器内的 `/announcements-src`，按文件名倒序生成 `/announcements/index.json`，并把 `.md` 与同目录资源文件一起同步到静态目录中。
+
+- 只识别公告目录根层级的 `*.md` 文件，不递归扫描子目录。
+- 建议文件名使用 `YYYY-MM-DD-name.md` 或 `YYYY-MM-DD_name.md`，例如 `2026-05-05-release.md`。
+- 页面会自动弹出最新一条公告，并在右上角保留公告入口，可查看历史公告。
+- Markdown 标题优先取正文第一行一级标题 `# 标题`；若没有，则回退到文件名。
+
+目录示例：
+
+```text
+announcements/
+  2026-05-05-release.md
+  2026-05-05-cover.png
+  2026-04-20-hotfix.md
+```
+
+`2026-05-05-release.md` 中可直接使用相对路径引用图片：
+
+```md
+# 五一版本公告
+
+![封面](2026-05-05-cover.png)
+
+- 新增挂载目录式公告系统
+- 支持自动弹窗和历史公告查看
+```
+
+**Docker CLI：**
+
+```bash
+docker run -d -p 8080:80 \
+  -e API_URL=https://api.openai.com/v1 \
+  -v "$(pwd)/announcements:/announcements-src:ro" \
+  ghcr.io/cooksleep/gpt_image_playground:latest
+```
+
+**Docker Compose：**
+
+```yaml
+services:
+  gpt-image-playground:
+    image: ghcr.io/cooksleep/gpt_image_playground:latest
+    environment:
+      - API_URL=https://api.openai.com/v1
+    volumes:
+      - ./announcements:/announcements-src:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+```
+
+修改公告目录内容后，重启容器即可生效。
+
 
 ### 访问门禁（`ACCESS_PASSWORD`）
 

@@ -34,9 +34,8 @@ export default function HelpModal({ onClose }: HelpModalProps) {
         <div className="mb-5 flex items-center justify-between gap-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
             <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <path d="M12 17h.01" />
+              <path d="M12 6.25c-1.75-1.4-4.53-2.25-7-2.25a1 1 0 0 0-1 1v11.5a1 1 0 0 0 1.18.98c2.13-.37 4.58.22 6.82 1.52 2.24-1.3 4.69-1.89 6.82-1.52A1 1 0 0 0 20 16.5V5a1 1 0 0 0-1-1c-2.47 0-5.25.85-7 2.25Z" />
+              <path d="M12 6.25V19" />
             </svg>
             操作指南
           </h3>

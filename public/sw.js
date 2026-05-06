@@ -26,6 +26,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   if (
     url.pathname.endsWith('/runtime-config.js') ||
+    url.pathname.includes('/announcements/') ||
     url.pathname.includes('/auth/') ||
     url.pathname.includes('/api-proxy/')
   ) {
