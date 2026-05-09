@@ -2,6 +2,12 @@ import { useMemo, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { useStore } from '../store'
 import { clearAccessState, writeAccessPassword, writeAccessSession } from '../lib/accessGate'
+import { readRuntimeConfig } from '../lib/runtimeConfig'
+
+export function getAccessGateTitle() {
+  const titleHint = readRuntimeConfig().accessPasswordTitleHint?.trim()
+  return titleHint ? `访问验证（${titleHint}）` : '访问验证'
+}
 
 export default function AccessGateModal() {
   const setAccessGranted = useStore((s) => s.setAccessGranted)
@@ -9,6 +15,7 @@ export default function AccessGateModal() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [shake, setShake] = useState(false)
+  const title = getAccessGateTitle()
 
   const cardClass = useMemo(() => `relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-6 shadow-2xl ring-1 ring-black/5 dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10 ${shake ? 'animate-[shake_0.28s_ease-in-out]' : ''}`, [shake])
 
@@ -47,7 +54,7 @@ export default function AccessGateModal() {
     <div data-no-drag-select className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
       <form onSubmit={handleSubmit} className={cardClass}>
-        <h3 className="mb-2 text-lg font-semibold text-gray-800 dark:text-gray-100">访问验证</h3>
+        <h3 className="mb-2 text-lg font-semibold text-gray-800 dark:text-gray-100">{title}</h3>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">请输入访问密码以解锁应用功能。</p>
         <input
           autoFocus

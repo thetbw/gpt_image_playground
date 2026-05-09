@@ -25,6 +25,7 @@ MANAGED_CODEX_CLI_VALUE=false
 MANAGED_API_MODE_FLAG=false
 MANAGED_API_MODE_VALUE=images
 MANAGED_PROXY_AUTH_FLAG=false
+ACCESS_PASSWORD_TITLE_HINT_VALUE=
 
 if [ -n "$MANAGED_API_URL" ]; then MANAGED_API_URL_FLAG=true; fi
 if [ -n "$MANAGED_API_KEY" ]; then
@@ -40,6 +41,9 @@ fi
 if [ "$MANAGED_API_MODE" = "images" ] || [ "$MANAGED_API_MODE" = "responses" ]; then
     MANAGED_API_MODE_FLAG=true
     MANAGED_API_MODE_VALUE=$MANAGED_API_MODE
+fi
+if [ -n "$ACCESS_PASSWORD_TITLE_HINT" ]; then
+    ACCESS_PASSWORD_TITLE_HINT_VALUE=$ACCESS_PASSWORD_TITLE_HINT
 fi
 
 escape_sed_replacement() {
@@ -66,7 +70,8 @@ window.__GPT_IMAGE_PLAYGROUND_CONFIG__ = Object.freeze({
   managedCodexCliValue: $MANAGED_CODEX_CLI_VALUE,
   managedApiMode: $MANAGED_API_MODE_FLAG,
   managedApiModeValue: "$(escape_js_string "$MANAGED_API_MODE_VALUE")",
-  managedProxyAuth: $MANAGED_PROXY_AUTH_FLAG
+  managedProxyAuth: $MANAGED_PROXY_AUTH_FLAG,
+  accessPasswordTitleHint: "$(escape_js_string "$ACCESS_PASSWORD_TITLE_HINT_VALUE")"
 });
 EOF
 

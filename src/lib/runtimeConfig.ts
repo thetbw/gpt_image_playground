@@ -8,6 +8,7 @@ export interface RuntimeConfig {
   managedApiMode?: boolean
   managedApiModeValue?: string
   managedProxyAuth?: boolean
+  accessPasswordTitleHint?: string
 }
 
 export function readRuntimeConfig(): RuntimeConfig {

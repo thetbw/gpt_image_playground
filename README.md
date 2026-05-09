@@ -242,15 +242,19 @@ services:
 
 可通过 `ACCESS_PASSWORD` 为容器增加一个轻量访问门禁。前端会先调用同源 `POST /auth/verify` 校验密码，密码只在服务端环境变量中保存，不会注入前端 JS 包。
 
+如果还希望在门禁弹窗标题后追加一段公开提示，可额外设置 `ACCESS_PASSWORD_TITLE_HINT`。例如设置为 `内网使用` 后，标题会显示为 `访问验证（内网使用）`。
+
 ```bash
 docker run -d -p 8080:80 \
   -e API_URL=https://api.openai.com/v1 \
   -e ACCESS_PASSWORD='your-strong-password' \
+  -e ACCESS_PASSWORD_TITLE_HINT='内网使用' \
   ghcr.io/cooksleep/gpt_image_playground:latest
 ```
 
 - 忘记密码时，直接修改容器环境变量并重启容器即可生效。
 - 前端不会缓存访问密码；刷新页面、重新打开页面，或服务端密码变更后，都需要重新输入。
+- `ACCESS_PASSWORD_TITLE_HINT` 仅用于前端展示，会进入运行时 `runtime-config.js`，请不要填写敏感信息。
 - 建议在公网部署时强制 HTTPS，避免密码明文传输。
 - 建议在前置反向代理层（如 Nginx/Traefik/Cloudflare）增加限流、失败次数控制与封禁策略，降低暴力尝试风险。
 

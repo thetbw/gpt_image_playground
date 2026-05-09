@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
+import AccessGateModal, { getAccessGateTitle } from './AccessGateModal'
 import {
   clearAccessState,
   isAccessGateRequired,
@@ -8,6 +10,44 @@ import {
   writeAccessPassword,
   writeAccessSession,
 } from '../lib/accessGate'
+
+describe('AccessGateModal', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('renders the default title when no hint is configured', () => {
+    vi.stubGlobal('window', {
+      __GPT_IMAGE_PLAYGROUND_CONFIG__: {},
+    })
+
+    expect(getAccessGateTitle()).toBe('访问验证')
+    expect(renderToStaticMarkup(<AccessGateModal />)).toContain('访问验证')
+  })
+
+  it('renders the title hint after the default title', () => {
+    vi.stubGlobal('window', {
+      __GPT_IMAGE_PLAYGROUND_CONFIG__: {
+        accessPasswordTitleHint: '内网使用',
+      },
+    })
+
+    expect(getAccessGateTitle()).toBe('访问验证（内网使用）')
+    expect(renderToStaticMarkup(<AccessGateModal />)).toContain('访问验证（内网使用）')
+  })
+
+  it('ignores empty and whitespace-only title hints', () => {
+    vi.stubGlobal('window', {
+      __GPT_IMAGE_PLAYGROUND_CONFIG__: {
+        accessPasswordTitleHint: '   ',
+      },
+    })
+
+    expect(getAccessGateTitle()).toBe('访问验证')
+    expect(renderToStaticMarkup(<AccessGateModal />)).toContain('访问验证')
+  })
+})
 
 describe('isAccessGateRequired', () => {
   afterEach(() => {
