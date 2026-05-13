@@ -24,6 +24,7 @@ import {
 } from './lib/db'
 import { callImageApi } from './lib/api'
 import { getFalErrorMessage, getFalQueuedImageResult, getFalQueueStatus } from './lib/falAiImageApi'
+import type { AnnouncementSummary } from './lib/announcements'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
@@ -74,6 +75,8 @@ interface AppState {
   setSettings: (s: Partial<AppSettings>) => void
   dismissedCodexCliPrompts: string[]
   dismissCodexCliPrompt: (key: string) => void
+  dismissedAnnouncementIds: string[]
+  dismissAnnouncement: (id: string) => void
 
   // 输入
   prompt: string
@@ -120,6 +123,14 @@ interface AppState {
   setLightboxImageId: (id: string | null, list?: string[]) => void
   showSettings: boolean
   setShowSettings: (v: boolean) => void
+  announcements: AnnouncementSummary[]
+  setAnnouncements: (announcements: AnnouncementSummary[]) => void
+  selectedAnnouncementId: string | null
+  setSelectedAnnouncementId: (id: string | null) => void
+  showAnnouncementModal: boolean
+  setShowAnnouncementModal: (v: boolean) => void
+  isAccessGranted: boolean
+  setAccessGranted: (granted: boolean) => void
 
   // Toast
   toast: { message: string; type: 'info' | 'success' | 'error' } | null
@@ -181,6 +192,12 @@ export const useStore = create<AppState>()(
         dismissedCodexCliPrompts: st.dismissedCodexCliPrompts.includes(key)
           ? st.dismissedCodexCliPrompts
           : [...st.dismissedCodexCliPrompts, key],
+      })),
+      dismissedAnnouncementIds: [],
+      dismissAnnouncement: (id) => set((st) => ({
+        dismissedAnnouncementIds: st.dismissedAnnouncementIds.includes(id)
+          ? st.dismissedAnnouncementIds
+          : [...st.dismissedAnnouncementIds, id],
       })),
 
       // Input
@@ -282,6 +299,14 @@ export const useStore = create<AppState>()(
         set({ lightboxImageId, lightboxImageList: list ?? (lightboxImageId ? [lightboxImageId] : []) }),
       showSettings: false,
       setShowSettings: (showSettings) => set({ showSettings }),
+      announcements: [],
+      setAnnouncements: (announcements) => set({ announcements }),
+      selectedAnnouncementId: null,
+      setSelectedAnnouncementId: (selectedAnnouncementId) => set({ selectedAnnouncementId }),
+      showAnnouncementModal: false,
+      setShowAnnouncementModal: (showAnnouncementModal) => set({ showAnnouncementModal }),
+      isAccessGranted: false,
+      setAccessGranted: (isAccessGranted) => set({ isAccessGranted }),
 
       // Toast
       toast: null,
@@ -304,7 +329,29 @@ export const useStore = create<AppState>()(
         prompt: state.prompt,
         inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
         dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
+        dismissedAnnouncementIds: state.dismissedAnnouncementIds,
       }),
+      merge: (persisted, current) => {
+        const persistedState = persisted as Partial<AppState> | undefined
+        const persistedSettings = persistedState?.settings
+        const settings = normalizeSettings({
+          ...DEFAULT_SETTINGS,
+          ...persistedSettings,
+          managedConfig: DEFAULT_SETTINGS.managedConfig,
+        })
+
+        return {
+          ...current,
+          ...persistedState,
+          settings,
+          params: {
+            ...current.params,
+            ...persistedState?.params,
+          },
+          dismissedCodexCliPrompts: persistedState?.dismissedCodexCliPrompts ?? current.dismissedCodexCliPrompts,
+          dismissedAnnouncementIds: persistedState?.dismissedAnnouncementIds ?? current.dismissedAnnouncementIds,
+        }
+      },
     },
   ),
 )
@@ -559,8 +606,9 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
     useStore.getState()
 
   const activeProfile = getActiveApiProfile(settings)
-  if (validateApiProfile(activeProfile)) {
-    showToast(`请先完善当前 Provider：${validateApiProfile(activeProfile)}`, 'error')
+  const profileError = validateApiProfile(activeProfile, settings.managedConfig)
+  if (profileError) {
+    showToast(`请先完善当前 Provider：${profileError}`, 'error')
     useStore.getState().setShowSettings(true)
     return
   }

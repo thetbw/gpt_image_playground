@@ -1,5 +1,6 @@
 import type { ApiProfile, ImageApiResponse, ResponsesApiResponse, TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
+import { invalidateAccess, readAccessPassword } from './accessGate'
 import { buildApiUrl, isApiProxyAvailable, readClientDevProxyConfig } from './devProxy'
 import {
   assertImageInputPayloadSize,
@@ -20,12 +21,43 @@ import {
 
 const PROMPT_REWRITE_GUARD_PREFIX = 'Use the following text as the complete prompt. Do not rewrite it:'
 
-function createRequestHeaders(profile: ApiProfile): Record<string, string> {
-  return {
-    Authorization: `Bearer ${profile.apiKey}`,
+function createRequestHeaders(profile: ApiProfile, opts: CallApiOptions, includeAccessPassword = false): Record<string, string> {
+  const headers: Record<string, string> = {
     'Cache-Control': 'no-store, no-cache, max-age=0',
     Pragma: 'no-cache',
   }
+  const managedConfig = opts.settings.managedConfig
+  if (!managedConfig.managedApiKey && !managedConfig.managedProxyAuth) {
+    headers.Authorization = `Bearer ${profile.apiKey}`
+  }
+  if (includeAccessPassword) {
+    const accessPassword = readAccessPassword()
+    if (accessPassword) headers['X-Access-Password'] = accessPassword
+  }
+  return headers
+}
+
+async function isAccessGateUnauthorizedResponse(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (contentType.includes('application/json')) return false
+
+  const contentLength = response.headers.get('content-length')
+  if (contentLength === '0') return true
+  if (!contentType || contentType.includes('text/html') || contentType.includes('text/plain')) return true
+
+  try {
+    return (await response.clone().text()).trim() === ''
+  } catch {
+    return false
+  }
+}
+
+async function throwIfAccessGateUnauthorized(response: Response, usingApiProxy: boolean) {
+  if (!usingApiProxy || !(await isAccessGateUnauthorizedResponse(response))) return
+  invalidateAccess()
+  throw new Error('访问密码已失效，请重新输入')
 }
 
 function createResponsesImageTool(
@@ -163,7 +195,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = profile.apiProxy && isApiProxyAvailable(proxyConfig)
-  const requestHeaders = createRequestHeaders(profile)
+  const requestHeaders = createRequestHeaders(profile, opts, useApiProxy)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
@@ -258,6 +290,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     }
 
     if (!response.ok) {
+      await throwIfAccessGateUnauthorized(response, useApiProxy)
       throw new Error(await getApiErrorMessage(response))
     }
 
@@ -340,7 +373,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = profile.apiProxy && isApiProxyAvailable(proxyConfig)
-  const requestHeaders = createRequestHeaders(profile)
+  const requestHeaders = createRequestHeaders(profile, opts, useApiProxy)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
 
@@ -373,6 +406,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
     })
 
     if (!response.ok) {
+      await throwIfAccessGateUnauthorized(response, useApiProxy)
       throw new Error(await getApiErrorMessage(response))
     }
 

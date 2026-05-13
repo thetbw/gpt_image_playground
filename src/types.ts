@@ -16,6 +16,14 @@ export interface ApiProfile {
   apiProxy: boolean
 }
 
+export interface ManagedConfig {
+  managedApiUrl: boolean
+  managedApiKey: boolean
+  managedCodexCli: boolean
+  managedApiMode: boolean
+  managedProxyAuth: boolean
+}
+
 export interface AppSettings {
   /** 旧版单配置字段：保留用于导入/查询参数兼容，实际请求以 active profile 为准 */
   baseUrl: string
@@ -28,6 +36,7 @@ export interface AppSettings {
   clearInputAfterSubmit: boolean
   profiles: ApiProfile[]
   activeProfileId: string
+  managedConfig: ManagedConfig
 }
 
 // ===== 任务参数 =====

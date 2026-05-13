@@ -138,6 +138,109 @@ services:
     restart: unless-stopped
 ```
 
+浏览器访问 `http://localhost:8080`，可在页面右上角设置中填写 API URL / API Key（若未启用受管模式）。
+
+如果你的 API 节点没有放开浏览器跨域，可以用环境变量 `ENABLE_API_PROXY=true` 开启容器内 Nginx 代理。开启后，设置面板才会展示 **API 代理** 开关；用户启用该开关后，浏览器会请求同源的 `/api-proxy/`，由容器内 Nginx 转发到部署端配置的 `API_PROXY_URL`。
+
+### 受管模式（Managed Mode）
+
+支持以下可选环境变量：
+
+- `MANAGED_API_URL`：托管前端的 API URL 设置。
+- `MANAGED_API_KEY`：托管服务端 API Key（不会注入前端 JS）。
+- `MANAGED_CODEX_CLI`：托管 Codex CLI 模式开关。
+- `MANAGED_API_MODE`：托管 API 模式（`images`/`responses`）。
+
+当上述字段被托管时：
+- 前端对应设置项会显示“由部署端托管，不可编辑”并禁用。
+- URL 查询参数对对应字段的覆盖会被禁用。
+- 若配置了 `MANAGED_API_KEY`，前端请求应走同源 `/api-proxy/`，由 Nginx 注入 `Authorization: Bearer ...` 后再转发到上游 API；密钥不会进入浏览器可读配置或构建产物。
+
+⚠️ **安全警告**：开启 `ENABLE_API_PROXY=true` 后，任何人都能将你的服务器作为代理来请求目标 API。虽然请求本身仍需携带有效的 API Key 才能成功，但这可能会消耗你的服务器带宽。如果目标 API 是内网服务或基于 IP 白名单免密访问，则存在被未经授权调用的风险。建议仅在本地开发或有访问控制（如 IP 白名单、前置认证机制等）的环境中开启此功能。
+
+如果使用 bridge 网络并修改了容器内 `PORT`，需要同步调整端口映射，例如 `PORT=28080` 时使用 `"8080:28080"`。使用 host 网络时不要配置 `ports`。
+
+### 挂载目录公告（`/announcements-src`）
+
+容器支持从挂载目录自动读取公告 Markdown 文件。启动时会扫描容器内的 `/announcements-src`，按文件名倒序生成 `/announcements/index.json`，并把 `.md` 与同目录资源文件一起同步到静态目录中。
+
+- 只识别公告目录根层级的 `*.md` 文件，不递归扫描子目录。
+- 建议文件名使用 `YYYY-MM-DD-name.md` 或 `YYYY-MM-DD_name.md`，例如 `2026-05-05-release.md`。
+- 页面会自动弹出最新一条公告，并在右上角保留公告入口，可查看历史公告。
+- Markdown 标题优先取正文第一行一级标题 `# 标题`；若没有，则回退到文件名。
+
+目录示例：
+
+```text
+announcements/
+  2026-05-05-release.md
+  2026-05-05-cover.png
+  2026-04-20-hotfix.md
+```
+
+`2026-05-05-release.md` 中可直接使用相对路径引用图片：
+
+```md
+# 五一版本公告
+
+![封面](2026-05-05-cover.png)
+
+- 新增挂载目录式公告系统
+- 支持自动弹窗和历史公告查看
+```
+
+**Docker CLI：**
+
+```bash
+docker run -d -p 8080:80 \
+  -e DEFAULT_API_URL=https://api.openai.com/v1 \
+  -e API_PROXY_URL=https://api.openai.com/v1 \
+  -v "$(pwd)/announcements:/announcements-src:ro" \
+  ghcr.io/cooksleep/gpt_image_playground:latest
+```
+
+**Docker Compose：**
+
+```yaml
+services:
+  gpt-image-playground:
+    image: ghcr.io/cooksleep/gpt_image_playground:latest
+    environment:
+      - DEFAULT_API_URL=https://api.openai.com/v1
+      - API_PROXY_URL=https://api.openai.com/v1
+    volumes:
+      - ./announcements:/announcements-src:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+```
+
+修改公告目录内容后，重启容器即可生效。
+
+
+### 访问门禁（`ACCESS_PASSWORD`）
+
+可通过 `ACCESS_PASSWORD` 为容器增加一个轻量访问门禁。前端会先调用同源 `POST /auth/verify` 校验密码，密码只在服务端环境变量中保存，不会注入前端 JS 包。
+
+如果还希望在门禁弹窗标题后追加一段公开提示，可额外设置 `ACCESS_PASSWORD_TITLE_HINT`。例如设置为 `内网使用` 后，标题会显示为 `访问验证（内网使用）`。
+
+```bash
+docker run -d -p 8080:80 \
+  -e DEFAULT_API_URL=https://api.openai.com/v1 \
+  -e API_PROXY_URL=https://api.openai.com/v1 \
+  -e ACCESS_PASSWORD='your-strong-password' \
+  -e ACCESS_PASSWORD_TITLE_HINT='内网使用' \
+  ghcr.io/cooksleep/gpt_image_playground:latest
+```
+
+- 忘记密码时，直接修改容器环境变量并重启容器即可生效。
+- 前端不会缓存访问密码；刷新页面、重新打开页面，或服务端密码变更后，都需要重新输入。
+- `ACCESS_PASSWORD_TITLE_HINT` 仅用于前端展示，会进入运行时 `runtime-config.js`，请不要填写敏感信息。
+- 建议在公网部署时强制 HTTPS，避免密码明文传输。
+- 建议在前置反向代理层（如 Nginx/Traefik/Cloudflare）增加限流、失败次数控制与封禁策略，降低暴力尝试风险。
+
+*(注：官方镜像同时提供带版本号的标签，如 `0.1.11` 或 `0.1`)*
+
 **更新说明：**
 
 使用 `latest` 标签时，重新拉取镜像并重启即可更新（如 `docker compose pull && docker compose up -d`）。若需固定版本可使用官方提供的版本号标签（如 `0.2.x`）。
@@ -191,10 +294,13 @@ npm run build
 
 应用支持通过 URL 查询参数快速填入配置，非常适合创建书签或集成分享：
 
+应用支持通过 URL 查询参数快速填充**非受管字段**配置：
+
 - `?apiUrl=https://你的代理地址.com`
 - `?apiKey=sk-xxxx`
 - `?apiMode=images` 或 `?apiMode=responses`（未传时默认为 `images`）
-- `?codexCli=true`（强制开启 Codex CLI 模式）
+- `?codexCli=true` 或 `?codexCli=false`，未传时默认关闭，仅 `true` 会开启 Codex CLI 模式
+- `?provider=openai` 或 `?provider=fal`
 
 例如，集成到 New API 的聊天系统：
 

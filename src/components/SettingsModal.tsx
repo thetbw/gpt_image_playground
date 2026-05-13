@@ -41,6 +41,8 @@ export default function SettingsModal() {
   
   const apiProxyAvailable = isApiProxyAvailable(readClientDevProxyConfig())
   const activeProfile = draft.profiles.find((profile) => profile.id === draft.activeProfileId) ?? draft.profiles[0] ?? getActiveApiProfile(draft)
+  const managed = draft.managedConfig
+  const managedProxy = managed.managedApiUrl || managed.managedProxyAuth
   const apiProxyEnabled = apiProxyAvailable && activeProfile.provider === 'openai' && activeProfile.apiProxy
 
   const getDefaultModelForMode = (apiMode: AppSettings['apiMode']) =>
@@ -80,8 +82,8 @@ export default function SettingsModal() {
         baseUrl: normalizedBaseUrl,
         model: profile.model.trim() || defaultModel,
         timeout: Number(profile.timeout) || DEFAULT_SETTINGS.timeout,
-        apiProxy: profile.provider === 'openai' && apiProxyAvailable ? profile.apiProxy : false,
-        codexCli: profile.provider === 'openai' ? profile.codexCli : false,
+        apiProxy: profile.provider === 'openai' && (apiProxyAvailable || managedProxy) ? profile.apiProxy || managedProxy : false,
+        codexCli: profile.provider === 'openai' ? (managed.managedCodexCli ? DEFAULT_SETTINGS.codexCli : profile.codexCli) : false,
       }
     })
     const fallbackProfile = createDefaultOpenAIProfile({ id: newId('openai') })
@@ -374,9 +376,10 @@ export default function SettingsModal() {
                     <div
                       onClick={(e) => {
                         e.preventDefault()
+                        if (managed.managedCodexCli) return
                         updateActiveProfile({ codexCli: !activeProfile.codexCli }, true)
                       }}
-                      className="flex cursor-pointer items-center gap-1.5"
+                      className={`flex items-center gap-1.5 ${managed.managedCodexCli ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                       role="switch"
                       aria-checked={activeProfile.codexCli}
                     >
@@ -391,12 +394,14 @@ export default function SettingsModal() {
                     onChange={(e) => updateActiveProfile({ baseUrl: e.target.value })}
                     onBlur={(e) => commitActiveProfilePatch({ baseUrl: e.target.value })}
                     type="text"
-                    disabled={apiProxyEnabled}
+                    disabled={apiProxyEnabled || managed.managedApiUrl}
                     placeholder={DEFAULT_SETTINGS.baseUrl}
-                    className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${apiProxyEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${(apiProxyEnabled || managed.managedApiUrl) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                   <div data-selectable-text className="mt-1 min-h-[22px] flex items-center text-[10px] text-gray-400 dark:text-gray-500">
-                    {apiProxyEnabled ? (
+                    {managed.managedApiUrl ? (
+                      <span className="text-yellow-600 dark:text-yellow-500">由部署端托管，不可编辑。</span>
+                    ) : apiProxyEnabled ? (
                       <span className="text-yellow-600 dark:text-yellow-500">已开启代理，实际请求目标由部署端决定，此处设置被忽略。</span>
                     ) : (
                       <span>支持通过查询参数覆盖：<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiUrl=</code>，<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">codexCli=true</code></span>
@@ -411,8 +416,12 @@ export default function SettingsModal() {
                     <span className="block text-xs text-gray-500 dark:text-gray-400">API 代理</span>
                     <button
                       type="button"
-                      onClick={() => updateActiveProfile({ apiProxy: !activeProfile.apiProxy }, true)}
-                      className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${activeProfile.apiProxy ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      onClick={() => {
+                        if (managedProxy) return
+                        updateActiveProfile({ apiProxy: !activeProfile.apiProxy }, true)
+                      }}
+                      disabled={managedProxy}
+                      className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${managedProxy ? 'cursor-not-allowed opacity-60' : ''} ${activeProfile.apiProxy ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                       role="switch"
                       aria-checked={activeProfile.apiProxy}
                       aria-label="API 代理"
@@ -421,7 +430,7 @@ export default function SettingsModal() {
                     </button>
                   </div>
                   <div data-selectable-text className="text-[10px] text-gray-400 dark:text-gray-500">
-                    由当前部署提供同源代理，用于解决浏览器跨域限制；开启后 API URL 设置会被忽略。
+                    {managedProxy ? '由部署端托管，请求会通过同源代理转发。' : '由当前部署提供同源代理，用于解决浏览器跨域限制；开启后 API URL 设置会被忽略。'}
                   </div>
                 </div>
               )}
@@ -430,12 +439,13 @@ export default function SettingsModal() {
                 <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">API Key</span>
                 <div className="relative">
                   <input
+                    disabled={managed.managedApiKey || managed.managedProxyAuth}
                     value={activeProfile.apiKey}
                     onChange={(e) => updateActiveProfile({ apiKey: e.target.value })}
                     onBlur={(e) => commitActiveProfilePatch({ apiKey: e.target.value })}
                     type={showApiKey ? 'text' : 'password'}
                     placeholder={activeProfile.provider === 'fal' ? 'FAL_KEY' : 'sk-...'}
-                    className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 pr-10 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+                    className={`w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 pr-10 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50 ${(managed.managedApiKey || managed.managedProxyAuth) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                   <button
                     type="button"
@@ -459,7 +469,7 @@ export default function SettingsModal() {
                   </button>
                 </div>
                 <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                  支持通过查询参数覆盖：<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiKey=</code>
+                  {(managed.managedApiKey || managed.managedProxyAuth) ? '由部署端托管，不可编辑。' : '仅保存在当前浏览器。'}
                 </div>
               </div>
 
@@ -469,6 +479,7 @@ export default function SettingsModal() {
                   <Select
                     value={activeProfile.apiMode ?? DEFAULT_SETTINGS.apiMode}
                     onChange={(value) => {
+                      if (managed.managedApiMode) return
                       const apiMode = value as AppSettings['apiMode']
                       const nextModel =
                         activeProfile.model === DEFAULT_IMAGES_MODEL || activeProfile.model === DEFAULT_RESPONSES_MODEL
@@ -481,9 +492,12 @@ export default function SettingsModal() {
                       { label: 'Responses API (/v1/responses)', value: 'responses' },
                     ]}
                     className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+                    disabled={managed.managedApiMode}
                   />
                   <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                    支持通过查询参数覆盖：<code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=images</code> 或 <code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=responses</code>。
+                    {managed.managedApiMode ? '由部署端托管，不可编辑。' : (
+                      <>支持通过查询参数覆盖：<code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=images</code> 或 <code className="rounded bg-gray-100 px-1 py-0.5 dark:bg-white/[0.06]">apiMode=responses</code>。</>
+                    )}
                   </div>
                 </label>
               )}

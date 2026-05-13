@@ -1,13 +1,74 @@
-import type { ApiMode, ApiProfile, ApiProvider, AppSettings } from '../types'
+import type { ApiMode, ApiProfile, ApiProvider, AppSettings, ManagedConfig } from '../types'
+import { readRuntimeConfig } from './runtimeConfig'
 import { readRuntimeEnv } from './runtimeEnv'
 
-const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL) || 'https://api.openai.com/v1'
+function readRuntimeString(value: string | undefined, fallback: string, runtimeValue?: string): string {
+  const trimmed = runtimeValue?.trim() || readRuntimeEnv(value)
+  if (!trimmed || /^__VITE_.+_PLACEHOLDER__$/.test(trimmed)) return fallback
+  return trimmed
+}
+
+function readRuntimeBoolean(value: string | undefined, runtimeValue?: boolean): boolean {
+  if (typeof runtimeValue === 'boolean') return runtimeValue
+  return readRuntimeEnv(value) === 'true'
+}
+
+function readRuntimeApiMode(value: string | undefined): ApiMode {
+  return value === 'responses' ? 'responses' : 'images'
+}
+
+const runtimeConfig = readRuntimeConfig()
+const DEFAULT_BASE_URL = readRuntimeString(
+  import.meta.env.VITE_DEFAULT_API_URL,
+  'https://api.openai.com/v1',
+  runtimeConfig.defaultApiUrl,
+)
 export const DEFAULT_IMAGES_MODEL = 'gpt-image-2'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 export const DEFAULT_FAL_BASE_URL = 'https://fal.run'
 export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
+
+export const DEFAULT_MANAGED_CONFIG: ManagedConfig = {
+  managedApiUrl: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_URL, runtimeConfig.managedApiUrl),
+  managedApiKey: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_KEY, runtimeConfig.managedApiKey),
+  managedCodexCli: readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI, runtimeConfig.managedCodexCli),
+  managedApiMode: readRuntimeBoolean(import.meta.env.VITE_MANAGED_API_MODE, runtimeConfig.managedApiMode),
+  managedProxyAuth: readRuntimeBoolean(import.meta.env.VITE_MANAGED_PROXY_AUTH, runtimeConfig.managedProxyAuth),
+}
+
+function readManagedConfig(input: Record<string, unknown>): ManagedConfig {
+  const raw = input.managedConfig && typeof input.managedConfig === 'object'
+    ? input.managedConfig as Record<string, unknown>
+    : {}
+
+  return {
+    managedApiUrl: typeof raw.managedApiUrl === 'boolean' ? raw.managedApiUrl : DEFAULT_MANAGED_CONFIG.managedApiUrl,
+    managedApiKey: typeof raw.managedApiKey === 'boolean' ? raw.managedApiKey : DEFAULT_MANAGED_CONFIG.managedApiKey,
+    managedCodexCli: typeof raw.managedCodexCli === 'boolean' ? raw.managedCodexCli : DEFAULT_MANAGED_CONFIG.managedCodexCli,
+    managedApiMode: typeof raw.managedApiMode === 'boolean' ? raw.managedApiMode : DEFAULT_MANAGED_CONFIG.managedApiMode,
+    managedProxyAuth: typeof raw.managedProxyAuth === 'boolean' ? raw.managedProxyAuth : DEFAULT_MANAGED_CONFIG.managedProxyAuth,
+  }
+}
+
+function getManagedApiMode(): ApiMode {
+  return readRuntimeApiMode(runtimeConfig.managedApiModeValue ?? readRuntimeEnv(import.meta.env.VITE_MANAGED_API_MODE_VALUE))
+}
+
+function getManagedCodexCli(): boolean {
+  return readRuntimeBoolean(import.meta.env.VITE_MANAGED_CODEX_CLI_VALUE, runtimeConfig.managedCodexCliValue)
+}
+
+function applyManagedProfile(profile: ApiProfile, managedConfig: ManagedConfig): ApiProfile {
+  return {
+    ...profile,
+    apiKey: managedConfig.managedApiKey || managedConfig.managedProxyAuth ? '' : profile.apiKey,
+    apiMode: managedConfig.managedApiMode ? getManagedApiMode() : profile.apiMode,
+    codexCli: managedConfig.managedCodexCli ? getManagedCodexCli() : profile.codexCli,
+    apiProxy: managedConfig.managedApiUrl || managedConfig.managedProxyAuth ? true : profile.apiProxy,
+  }
+}
 
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   return {
@@ -85,6 +146,7 @@ export function normalizeApiProfile(input: unknown, fallback?: Partial<ApiProfil
 
 export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSettings {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
+  const managedConfig = readManagedConfig(record)
   const legacyProfile = createDefaultOpenAIProfile({
     baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : DEFAULT_BASE_URL,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : '',
@@ -100,7 +162,10 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   const activeProfileId = typeof record.activeProfileId === 'string' && profiles.some((p) => p.id === record.activeProfileId)
     ? record.activeProfileId
     : profiles[0].id
-  const active = profiles.find((p) => p.id === activeProfileId) ?? profiles[0]
+  const managedProfiles = profiles.map((profile) =>
+    profile.id === activeProfileId ? applyManagedProfile(profile, managedConfig) : profile,
+  )
+  const active = managedProfiles.find((p) => p.id === activeProfileId) ?? managedProfiles[0]
 
   return {
     baseUrl: active.baseUrl,
@@ -111,8 +176,9 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     codexCli: active.codexCli,
     apiProxy: active.apiProxy,
     clearInputAfterSubmit: typeof record.clearInputAfterSubmit === 'boolean' ? record.clearInputAfterSubmit : false,
-    profiles,
+    profiles: managedProfiles,
     activeProfileId,
+    managedConfig,
   }
 }
 
@@ -120,23 +186,28 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
   const record = settings && typeof settings === 'object' ? settings as Record<string, unknown> : {}
   const normalized = normalizeSettings(settings)
   const profile = normalized.profiles.find((p) => p.id === normalized.activeProfileId) ?? normalized.profiles[0] ?? createDefaultOpenAIProfile()
+  const managedConfig = normalized.managedConfig
 
   return {
     ...profile,
     baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
-    apiKey: typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
+    apiKey: !managedConfig.managedApiKey && !managedConfig.managedProxyAuth && typeof record.apiKey === 'string'
+      ? record.apiKey
+      : profile.apiKey,
     model: typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
     timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : profile.timeout,
-    apiMode: record.apiMode === 'images' || record.apiMode === 'responses' ? record.apiMode : profile.apiMode,
-    codexCli: typeof record.codexCli === 'boolean' ? record.codexCli : profile.codexCli,
-    apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : profile.apiProxy,
+    apiMode: !managedConfig.managedApiMode && (record.apiMode === 'images' || record.apiMode === 'responses') ? record.apiMode : profile.apiMode,
+    codexCli: !managedConfig.managedCodexCli && typeof record.codexCli === 'boolean' ? record.codexCli : profile.codexCli,
+    apiProxy: !managedConfig.managedApiUrl && !managedConfig.managedProxyAuth && typeof record.apiProxy === 'boolean'
+      ? record.apiProxy
+      : profile.apiProxy,
   }
 }
 
-export function validateApiProfile(profile: ApiProfile): string | null {
+export function validateApiProfile(profile: ApiProfile, managedConfig: ManagedConfig = DEFAULT_MANAGED_CONFIG): string | null {
   if (!profile.name.trim()) return '缺少名称'
   if (profile.provider === 'openai' && !profile.baseUrl.trim()) return '缺少 API URL'
-  if (!profile.apiKey.trim()) return '缺少 API Key'
+  if (!profile.apiKey.trim() && !managedConfig.managedApiKey && !managedConfig.managedProxyAuth) return '缺少 API Key'
   if (!profile.model.trim()) return '缺少模型 ID'
   return null
 }
@@ -223,8 +294,9 @@ export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   apiKey: '',
   model: DEFAULT_IMAGES_MODEL,
   timeout: DEFAULT_API_TIMEOUT,
-  apiMode: 'images',
-  codexCli: false,
-  apiProxy: false,
+  apiMode: DEFAULT_MANAGED_CONFIG.managedApiMode ? getManagedApiMode() : 'images',
+  codexCli: DEFAULT_MANAGED_CONFIG.managedCodexCli ? getManagedCodexCli() : false,
+  apiProxy: DEFAULT_MANAGED_CONFIG.managedApiUrl || DEFAULT_MANAGED_CONFIG.managedProxyAuth,
   clearInputAfterSubmit: false,
+  managedConfig: DEFAULT_MANAGED_CONFIG,
 })

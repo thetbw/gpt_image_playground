@@ -1,0 +1,9 @@
+#!/bin/sh
+
+if [ -n "$MANAGED_API_URL" ]; then
+    export API_PROXY_URL="$MANAGED_API_URL"
+fi
+
+if [ -n "$MANAGED_API_URL" ] || [ -n "$MANAGED_API_KEY" ]; then
+    export ENABLE_API_PROXY=true
+fi

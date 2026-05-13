@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gpt-image-playground-v0.1.5'
+const CACHE_NAME = 'gpt-image-playground-v0.2.18-runtime-config'
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './pwa-icon.svg']
 
 self.addEventListener('install', (event) => {
@@ -24,6 +24,15 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+  if (
+    url.pathname.endsWith('/runtime-config.js') ||
+    url.pathname.includes('/announcements/') ||
+    url.pathname.includes('/auth/') ||
+    url.pathname.includes('/api-proxy/')
+  ) {
+    event.respondWith(fetch(request))
+    return
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(
